@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { canManageQuestionTypes, getCurrentUserRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 
+export type StudentApiErrorCode =
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
+  | "NOT_FOUND"
+  | "VALIDATION_ERROR"
+  | "SERVER_ERROR";
+
 type StudentApiAuthResult =
   | {
       ok: true;
@@ -21,7 +28,7 @@ export async function requireStudentApiUser(): Promise<StudentApiAuthResult> {
   if (!user) {
     return {
       ok: false,
-      response: jsonError("Unauthorized", 401)
+      response: jsonError("UNAUTHORIZED", "请先登录", 401)
     };
   }
 
@@ -30,7 +37,7 @@ export async function requireStudentApiUser(): Promise<StudentApiAuthResult> {
   if (canManageQuestionTypes(role)) {
     return {
       ok: false,
-      response: jsonError("Student APIs are not available to teacher/admin", 403)
+      response: jsonError("FORBIDDEN", "该接口仅允许学生账号访问", 403)
     };
   }
 
@@ -40,11 +47,18 @@ export async function requireStudentApiUser(): Promise<StudentApiAuthResult> {
   };
 }
 
-export function jsonError(message: string, status = 400) {
+export function jsonError(
+  code: StudentApiErrorCode,
+  message: string,
+  status = 400
+) {
   return NextResponse.json(
     {
       ok: false,
-      error: message
+      error: {
+        code,
+        message
+      }
     },
     { status }
   );

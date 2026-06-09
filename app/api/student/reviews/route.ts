@@ -10,6 +10,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// Mini program usage: call GET /api/student/reviews to fetch today's pending
+// review tasks and the current student's completed count.
 export async function GET() {
   const auth = await requireStudentApiUser();
 
@@ -29,6 +31,7 @@ export async function GET() {
     });
   } catch (error) {
     return jsonError(
+      "SERVER_ERROR",
       error instanceof Error ? error.message : "Failed to load reviews",
       500
     );

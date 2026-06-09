@@ -1481,6 +1481,84 @@ RLS：
 
 ---
 
+# 当前补充说明：学生端 API
+
+未来微信小程序学生端预留接口位于：
+
+```text
+app/api/student/_utils.ts
+app/api/student/dashboard/route.ts
+app/api/student/mistakes/route.ts
+app/api/student/reviews/route.ts
+app/api/student/weak-practice/route.ts
+app/api/student/solutions/route.ts
+```
+
+接口列表：
+
+- `GET /api/student/dashboard`
+  - 返回当前学生 Dashboard 汇总。
+  - 复用 `services/student/dashboard.ts`。
+- `GET /api/student/mistakes?questionTypeId=<uuid>`
+  - 返回当前学生自己的错题列表和可筛选题型。
+  - `questionTypeId` 可选。
+  - 复用 `services/student/mistakes.ts`。
+- `GET /api/student/reviews`
+  - 返回当前学生今日待复习任务和今日已完成数量。
+  - 复用 `services/student/reviews.ts`。
+  - `task.mistake.displayLatex` 按 `rawLatex -> latexContent -> rawText -> stem` 生成。
+  - `task.mistake.hasAnswerContent` 会同时检查 `mistakes` 和关联 `problems` 的答案/解析内容。
+- `GET /api/student/weak-practice`
+  - 返回或生成当前学生今日薄弱巩固任务。
+  - 复用 `services/student/weak-practice.ts`。
+  - `task.sourceLabel` 映射 `weak -> 薄弱题型`、`secondary -> 次薄弱题型`、`random -> 随机挑战`。
+  - `task.problem.displayLatex` 面向小程序展示，当前由教师题库题目 `raw_latex` 生成；后续若接入更多来源，可按 `rawLatex -> raw_latex -> latexContent -> stem` 扩展。
+  - 次薄弱题型题库不足时允许由随机题补足，保证每日训练数量尽量达到 5 题。
+- `GET /api/student/solutions?mistakeId=<uuid>`
+  - 返回当前学生某道错题的答案解析。
+  - `mistakeId` 必填。
+  - 复用 `services/student/solutions.ts`。
+  - 缺少 `mistakeId` 时返回 `VALIDATION_ERROR`，message 固定为 `Missing mistakeId`。
+
+统一 JSON 响应：
+
+```json
+{
+  "ok": true,
+  "data": {}
+}
+```
+
+成功响应的 `data` 只包含业务数据，不再透传页面 service 内部的 `error: null` 字段；如果 service 返回错误，API 会转换为失败响应。
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "请先登录"
+  }
+}
+```
+
+统一错误码：
+
+- `UNAUTHORIZED`：未登录，HTTP 401。
+- `FORBIDDEN`：非学生账号访问学生 API，HTTP 403。
+- `NOT_FOUND`：目标资源不存在或不属于当前学生，HTTP 404。
+- `VALIDATION_ERROR`：缺少必要参数或参数不合法，HTTP 400。
+- `SERVER_ERROR`：服务端读取或聚合数据失败，HTTP 500。
+
+权限边界：
+
+- API 使用 `requireStudentApiUser()` 统一检查登录态和角色。
+- teacher/admin 不走学生 API，会返回 `FORBIDDEN`。
+- 学生接口只传入当前登录用户 `user.id` 到 `services/student/*`。
+- 学生只能读取自己的 `mistakes`、`review_tasks`、`weak_practice_tasks` 和答案解析数据。
+- 该 API 稳定化不修改数据库，不影响现有 Web 页面。
+
+---
+
 # 当前补充说明：题型级联筛选
 
 题型筛选统一使用：

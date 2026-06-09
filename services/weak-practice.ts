@@ -36,12 +36,14 @@ export type WeakPracticeTask = {
   id: string;
   practiceDate: string;
   sourceType: SourceType;
+  sourceLabel: string;
   status: "pending" | "completed";
   result: PracticeResult;
   completedAt: string | null;
   problem: {
     id: string;
     rawLatex: string;
+    displayLatex: string;
     answer: string | null;
     analysis: string | null;
     questionType: QuestionTypeInfo | null;
@@ -291,6 +293,8 @@ function selectPracticeProblems({
     });
   }
 
+  // If there are not enough secondary-type problems, random fallback below is
+  // intentional so the daily set can still be filled up to five tasks.
   while (selected.length < targetCount) {
     const before = selected.length;
     pickIntoSelection({
@@ -352,6 +356,7 @@ function normalizePracticeTask(row: PracticeTaskRawRow): WeakPracticeTask {
     id: row.id,
     practiceDate: row.practice_date,
     sourceType: row.source_type,
+    sourceLabel: getSourceLabel(row.source_type),
     status: row.status,
     result: row.result,
     completedAt: row.completed_at,
@@ -359,6 +364,7 @@ function normalizePracticeTask(row: PracticeTaskRawRow): WeakPracticeTask {
       ? {
           id: problem.id,
           rawLatex: problem.raw_latex,
+          displayLatex: problem.raw_latex,
           answer: problem.answer,
           analysis: problem.analysis,
           questionType
@@ -373,6 +379,18 @@ function normalizeProblem(value: PracticeTaskRawRow["problems"]) {
 
 function normalizeQuestionType(value: ProblemInfo["question_types"]) {
   return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function getSourceLabel(sourceType: SourceType) {
+  if (sourceType === "weak") {
+    return "薄弱题型";
+  }
+
+  if (sourceType === "secondary") {
+    return "次薄弱题型";
+  }
+
+  return "随机挑战";
 }
 
 function getOrCreateScore(map: Map<string, WeaknessScore>, questionTypeId: string) {

@@ -7,6 +7,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// Mini program usage: call GET /api/student/solutions?mistakeId=<uuid> to
+// fetch the answer and analysis for one mistake owned by the current student.
 export async function GET(request: Request) {
   const auth = await requireStudentApiUser();
 
@@ -18,7 +20,7 @@ export async function GET(request: Request) {
   const mistakeId = searchParams.get("mistakeId") ?? searchParams.get("id");
 
   if (!mistakeId) {
-    return jsonError("Missing mistakeId");
+    return jsonError("VALIDATION_ERROR", "Missing mistakeId");
   }
 
   try {
@@ -29,12 +31,13 @@ export async function GET(request: Request) {
     });
 
     if (!data) {
-      return jsonError("Solution not found", 404);
+      return jsonError("NOT_FOUND", "未找到该错题答案解析", 404);
     }
 
     return jsonData(data);
   } catch (error) {
     return jsonError(
+      "SERVER_ERROR",
       error instanceof Error ? error.message : "Failed to load solution",
       500
     );

@@ -7,6 +7,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// Mini program usage: call GET /api/student/mistakes, optionally with
+// ?questionTypeId=<uuid>, to list only the current student's mistakes.
 export async function GET(request: Request) {
   const auth = await requireStudentApiUser();
 
@@ -18,11 +20,19 @@ export async function GET(request: Request) {
   const questionTypeId = searchParams.get("questionTypeId") ?? "";
 
   try {
-    return jsonData(
-      await getStudentMistakesPageData(questionTypeId, auth.userId)
+    const { error, ...data } = await getStudentMistakesPageData(
+      questionTypeId,
+      auth.userId
     );
+
+    if (error) {
+      return jsonError("SERVER_ERROR", error.message, 500);
+    }
+
+    return jsonData(data);
   } catch (error) {
     return jsonError(
+      "SERVER_ERROR",
       error instanceof Error ? error.message : "Failed to load mistakes",
       500
     );
