@@ -43,7 +43,10 @@ type QuestionTypeFromDb = {
   }[];
 };
 
-export async function getStudentMistakesPageData(questionTypeId: string) {
+export async function getStudentMistakesPageData(
+  questionTypeId: string,
+  userId?: string
+) {
   const supabase = await createClient();
   const [{ data: questionTypes }, mistakesResult] = await Promise.all([
     supabase
@@ -53,7 +56,7 @@ export async function getStudentMistakesPageData(questionTypeId: string) {
       .order("level1", { ascending: true })
       .order("level2", { ascending: true })
       .order("level3", { ascending: true }),
-    getStudentMistakes(questionTypeId)
+    getStudentMistakes(questionTypeId, userId)
   ]);
 
   return {
@@ -110,7 +113,7 @@ export async function getStudentClassifierQuestionTypes() {
   );
 }
 
-async function getStudentMistakes(questionTypeId: string) {
+async function getStudentMistakes(questionTypeId: string, userId?: string) {
   const supabase = await createClient();
   let query = supabase
     .from("mistakes")
@@ -121,6 +124,10 @@ async function getStudentMistakes(questionTypeId: string) {
 
   if (questionTypeId) {
     query = query.eq("question_type_id", questionTypeId);
+  }
+
+  if (userId) {
+    query = query.eq("user_id", userId);
   }
 
   return query;

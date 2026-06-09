@@ -70,10 +70,12 @@ type ReviewTaskRow = {
     | null;
 };
 
-export async function getTodayReviewTasks(): Promise<TodayReviewTask[]> {
+export async function getTodayReviewTasks(
+  userId?: string
+): Promise<TodayReviewTask[]> {
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await supabase
+  let query = supabase
     .from("review_tasks")
     .select(
       "id, review_date, review_round, mistakes(id, stem, raw_text, raw_latex, latex_content, input_type, note, question_types(level1, level2, level3))"
@@ -82,6 +84,12 @@ export async function getTodayReviewTasks(): Promise<TodayReviewTask[]> {
     .lte("review_date", today)
     .order("review_date", { ascending: true });
 
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  const { data, error } = await query;
+
   if (error) {
     throw new Error(error.message);
   }
@@ -89,16 +97,22 @@ export async function getTodayReviewTasks(): Promise<TodayReviewTask[]> {
   return ((data ?? []) as unknown as ReviewTaskRow[]).map(normalizeReviewTask);
 }
 
-export async function getCompletedTodayCount() {
+export async function getCompletedTodayCount(userId?: string) {
   const supabase = await createClient();
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const { count } = await supabase
+  let query = supabase
     .from("review_tasks")
     .select("id", { count: "exact", head: true })
     .eq("status", "completed")
     .gte("completed_at", startOfToday.toISOString());
+
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  const { count } = await query;
 
   return count ?? 0;
 }
