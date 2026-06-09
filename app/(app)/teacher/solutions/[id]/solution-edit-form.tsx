@@ -6,13 +6,15 @@ import { LatexContentRenderer } from "@/components/problems/LatexContentRenderer
 import { updateSolution } from "../actions";
 
 type SolutionEditFormProps = {
-  problemId: string;
+  recordId: string;
+  solutionType: "problem" | "mistake";
   initialAnswer: string | null;
   initialAnalysis: string | null;
 };
 
 export function SolutionEditForm({
-  problemId,
+  recordId,
+  solutionType,
   initialAnswer,
   initialAnalysis
 }: SolutionEditFormProps) {
@@ -25,7 +27,8 @@ export function SolutionEditForm({
         action={updateSolution}
         className="rounded-md border border-ink/10 bg-white p-5 shadow-sm"
       >
-        <input type="hidden" name="problemId" value={problemId} />
+        <input type="hidden" name="recordId" value={recordId} />
+        <input type="hidden" name="solutionType" value={solutionType} />
         <div>
           <h2 className="text-lg font-semibold text-ink">编辑答案解析</h2>
           <p className="mt-2 text-sm leading-6 text-ink/65">

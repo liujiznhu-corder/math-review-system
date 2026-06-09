@@ -326,6 +326,61 @@ export type Database = {
           }
         ];
       };
+      weak_practice_tasks: {
+        Row: {
+          id: string;
+          user_id: string;
+          problem_id: string;
+          question_type_id: string;
+          practice_date: string;
+          source_type: "weak" | "secondary" | "random";
+          status: "pending" | "completed";
+          result: "mastered" | "not_mastered" | null;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          problem_id: string;
+          question_type_id: string;
+          practice_date: string;
+          source_type: "weak" | "secondary" | "random";
+          status?: "pending" | "completed";
+          result?: "mastered" | "not_mastered" | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          problem_id?: string;
+          question_type_id?: string;
+          practice_date?: string;
+          source_type?: "weak" | "secondary" | "random";
+          status?: "pending" | "completed";
+          result?: "mastered" | "not_mastered" | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "weak_practice_tasks_problem_id_fkey";
+            columns: ["problem_id"];
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "weak_practice_tasks_question_type_id_fkey";
+            columns: ["question_type_id"];
+            referencedRelation: "question_types";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       knowledge_mastery: {
         Row: {
           id: string;

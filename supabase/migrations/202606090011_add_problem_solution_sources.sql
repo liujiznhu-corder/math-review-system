@@ -28,40 +28,6 @@ begin
   end if;
 end $$;
 
-insert into public.problems (
-  created_by,
-  question_type_id,
-  problem_type,
-  raw_latex,
-  normalized_text,
-  options_json,
-  answer,
-  analysis,
-  source,
-  source_type,
-  source_mistake_id,
-  created_at,
-  updated_at
-)
-select
-  m.user_id,
-  m.question_type_id,
-  m.problem_type,
-  coalesce(nullif(m.raw_latex, ''), nullif(m.latex_content, ''), m.stem),
-  coalesce(m.normalized_stem, m.stem),
-  m.options_json,
-  m.answer,
-  m.analysis,
-  m.source,
-  'student_submitted',
-  m.id,
-  m.created_at,
-  m.updated_at
-from public.mistakes m
-where m.question_type_id is not null
-  and m.classification_status in ('student_selected', 'teacher_confirmed')
-  and not exists (
-    select 1
-    from public.problems p
-    where p.source_mistake_id = m.id
-  );
+-- Do not backfill student mistakes into public.problems here.
+-- Student-submitted mistakes are shown in the solution center directly.
+-- Teachers add selected mistakes to the problem library manually from /teacher/solutions.

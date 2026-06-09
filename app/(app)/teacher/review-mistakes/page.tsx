@@ -105,7 +105,7 @@ export default async function ReviewMistakesPage({
         <p className="text-sm font-medium text-clay">教师端</p>
         <h1 className="mt-1 text-2xl font-semibold text-ink">错题审核</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
-          查看学生提交的待分类错题，参考系统推荐后确认最终题型。
+          审核页只负责确认学生错题的最终题型。需要沉淀到教师题库时，请到答案解析中心手动加入。
         </p>
       </div>
 
@@ -227,6 +227,7 @@ export default async function ReviewMistakesPage({
                         ))}
                       </select>
                     </label>
+
                     <label className="block text-sm font-medium text-ink">
                       题目类型
                       <select
@@ -239,6 +240,7 @@ export default async function ReviewMistakesPage({
                         <option value="calculation">计算题</option>
                       </select>
                     </label>
+
                     <label className="block text-sm font-medium text-ink">
                       规范化 raw_latex
                       <textarea
@@ -247,10 +249,11 @@ export default async function ReviewMistakesPage({
                         defaultValue={
                           mistake.raw_latex ?? mistake.latex_content ?? ""
                         }
-                        placeholder="可选：将学生题目整理为教师原生 LaTeX，保存后后续导出会优先使用该内容。"
+                        placeholder="可选：将学生题目整理为教师原生 LaTeX，保存后学生答案页和答案解析中心会优先使用该内容。"
                         className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 font-mono text-sm leading-6 outline-none focus:border-moss"
                       />
                     </label>
+
                     <label className="block text-sm font-medium text-ink">
                       教师备注
                       <textarea
@@ -260,24 +263,36 @@ export default async function ReviewMistakesPage({
                         className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 text-sm leading-6 outline-none focus:border-moss"
                       />
                     </label>
-                    <label className="block text-sm font-medium text-ink">
-                      答案（可选，支持 LaTeX）
-                      <textarea
-                        name="answer"
-                        rows={3}
-                        placeholder="可选：例如 $\\frac{1}{2}$"
-                        className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 font-mono text-sm leading-6 outline-none focus:border-moss"
-                      />
-                    </label>
-                    <label className="block text-sm font-medium text-ink">
-                      解析（可选，支持 LaTeX）
-                      <textarea
-                        name="analysis"
-                        rows={5}
-                        placeholder="可选：填写解题步骤、关键公式或易错点。"
-                        className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 font-mono text-sm leading-6 outline-none focus:border-moss"
-                      />
-                    </label>
+
+                    <details className="rounded-md border border-ink/10 bg-paper p-4">
+                      <summary className="cursor-pointer text-sm font-medium text-ink">
+                        可选：补充答案解析
+                      </summary>
+                      <p className="mt-2 text-xs leading-5 text-ink/55">
+                        答案解析中心是统一维护入口。这里填写时仅保存到学生错题，之后仍可在答案解析中心继续编辑。
+                      </p>
+                      <div className="mt-4 grid gap-4">
+                        <label className="block text-sm font-medium text-ink">
+                          答案（可选，支持 LaTeX）
+                          <textarea
+                            name="answer"
+                            rows={3}
+                            placeholder="可选：例如 $\\frac{1}{2}$"
+                            className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 font-mono text-sm leading-6 outline-none focus:border-moss"
+                          />
+                        </label>
+                        <label className="block text-sm font-medium text-ink">
+                          解析（可选，支持 LaTeX）
+                          <textarea
+                            name="analysis"
+                            rows={5}
+                            placeholder="可选：填写解题步骤、关键公式或易错点。"
+                            className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 font-mono text-sm leading-6 outline-none focus:border-moss"
+                          />
+                        </label>
+                      </div>
+                    </details>
+
                     <div>
                       <button
                         type="submit"

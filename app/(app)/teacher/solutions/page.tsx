@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { CheckCircle2, Copy, FilePenLine, Search } from "lucide-react";
+import { FilePenLine, LibraryBig, Search } from "lucide-react";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
+import { CascadingQuestionTypeFilters } from "@/components/question-types/CascadingQuestionTypeFilters";
 import {
   canManageQuestionTypes,
   getCurrentUserRole,
@@ -9,6 +10,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/types/database";
 import { CopyLatexButton } from "../problems/copy-latex-button";
+import { addMistakeToProblemLibrary } from "./actions";
 
 type QuestionTypeRow = Pick<
   Database["public"]["Tables"]["question_types"]["Row"],
@@ -32,12 +34,46 @@ type ProblemRow = Pick<
   | "analysis"
   | "source"
   | "source_type"
+  | "source_mistake_id"
   | "updated_at"
 > & {
   question_types: QuestionTypeRow | QuestionTypeRow[] | null;
 };
 
-type SolutionRow = Omit<ProblemRow, "question_types"> & {
+type MistakeRow = Pick<
+  Database["public"]["Tables"]["mistakes"]["Row"],
+  | "id"
+  | "user_id"
+  | "question_type_id"
+  | "problem_type"
+  | "stem"
+  | "raw_latex"
+  | "latex_content"
+  | "normalized_stem"
+  | "answer"
+  | "analysis"
+  | "source"
+  | "updated_at"
+> & {
+  question_types: QuestionTypeRow | QuestionTypeRow[] | null;
+};
+
+type SolutionRow = {
+  id: string;
+  routeId: string;
+  solutionType: "problem" | "mistake";
+  createdBy: string | null;
+  questionTypeId: string | null;
+  problemType: "single_choice" | "fill_blank" | "calculation";
+  rawLatex: string;
+  normalizedText: string | null;
+  answer: string | null;
+  analysis: string | null;
+  source: string | null;
+  sourceType: "teacher_created" | "student_submitted";
+  sourceMistakeId: string | null;
+  isInProblemLibrary: boolean;
+  updatedAt: string;
   questionType: QuestionTypeRow | null;
   submitter: ProfileRow | null;
 };
@@ -48,6 +84,7 @@ type SolutionsPageProps = {
     problemType?: string;
     level1?: string;
     level2?: string;
+    level3?: string;
     questionTypeId?: string;
     answerStatus?: string;
     analysisStatus?: string;
@@ -74,6 +111,7 @@ export default async function SolutionsPage({
     problemType: params?.problemType ?? "",
     level1: params?.level1 ?? "",
     level2: params?.level2 ?? "",
+    level3: params?.level3 ?? "",
     questionTypeId: params?.questionTypeId ?? "",
     answerStatus: params?.answerStatus ?? "",
     analysisStatus: params?.analysisStatus ?? "",
@@ -81,8 +119,9 @@ export default async function SolutionsPage({
     submitter: params?.submitter ?? "",
     keyword: params?.keyword ?? ""
   };
+
   const admin = createAdminClient();
-  const [{ data: questionTypes }, { data: problems, error }] =
+  const [{ data: questionTypes }, { data: problems, error: problemsError }, { data: mistakes, error: mistakesError }] =
     await Promise.all([
       admin
         .from("question_types")
@@ -94,19 +133,44 @@ export default async function SolutionsPage({
       admin
         .from("problems")
         .select(
-          "id, created_by, question_type_id, problem_type, raw_latex, normalized_text, answer, analysis, source, source_type, updated_at, question_types(id, level1, level2, level3)"
+          "id, created_by, question_type_id, problem_type, raw_latex, normalized_text, answer, analysis, source, source_type, source_mistake_id, updated_at, question_types(id, level1, level2, level3)"
         )
+        .order("updated_at", { ascending: false }),
+      admin
+        .from("mistakes")
+        .select(
+          "id, user_id, question_type_id, problem_type, stem, raw_latex, latex_content, normalized_stem, answer, analysis, source, updated_at, question_types(id, level1, level2, level3)"
+        )
+        .not("question_type_id", "is", null)
+        .in("classification_status", ["student_selected", "teacher_confirmed"])
         .order("updated_at", { ascending: false })
     ]);
-  const baseRows = normalizeProblems((problems ?? []) as unknown as ProblemRow[]);
-  const submitters = await getSubmitters(baseRows);
-  const rows = baseRows.map((row) => ({
+
+  const problemRows = normalizeProblemRows(
+    (problems ?? []) as unknown as ProblemRow[]
+  );
+  const problemMistakeIds = new Set(
+    problemRows
+      .map((row) => row.sourceMistakeId)
+      .filter((id): id is string => Boolean(id))
+  );
+  const orphanMistakeRows = normalizeMistakeRows(
+    (mistakes ?? []) as unknown as MistakeRow[],
+    problemMistakeIds
+  );
+  const rowsWithoutSubmitters = [...problemRows, ...orphanMistakeRows].sort(
+    (a, b) =>
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+  const submitters = await getSubmitters(rowsWithoutSubmitters);
+  const rows = rowsWithoutSubmitters.map((row) => ({
     ...row,
-    submitter: row.created_by ? (submitters.get(row.created_by) ?? null) : null
+    submitter: row.createdBy ? (submitters.get(row.createdBy) ?? null) : null
   }));
   const filteredRows = filterRows(rows, filters);
   const stats = buildStats(rows);
   const questionTypeOptions = (questionTypes ?? []) as QuestionTypeRow[];
+  const pageError = problemsError?.message ?? mistakesError?.message;
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-6 py-8">
@@ -117,7 +181,8 @@ export default async function SolutionsPage({
             答案解析中心
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
-            统一维护教师题库和学生已确认错题的答案解析，题目录入与答案维护分离。
+            统一维护教师题库和学生已确认错题的答案解析。答案与解析以原始
+            LaTeX/Markdown 源码保存，学生端只负责查看。
           </p>
         </div>
       </div>
@@ -128,9 +193,9 @@ export default async function SolutionsPage({
         </p>
       ) : null}
 
-      {error ? (
+      {pageError ? (
         <p className="mt-6 rounded-md border border-clay/30 bg-clay/10 px-4 py-3 text-sm text-clay">
-          {error.message}
+          {pageError}
         </p>
       ) : null}
 
@@ -144,6 +209,16 @@ export default async function SolutionsPage({
 
       <section className="mt-8 rounded-md border border-ink/10 bg-white p-5 shadow-sm">
         <form className="grid gap-4 lg:grid-cols-5">
+          <CascadingQuestionTypeFilters
+            questionTypes={questionTypeOptions}
+            selectedLevel1={filters.level1}
+            selectedLevel2={filters.level2}
+            selectedLevel3={filters.level3}
+            selectedQuestionTypeId={filters.questionTypeId}
+            hiddenQuestionTypeIdName="questionTypeId"
+            disableLegacyFields
+            className="contents"
+          />
           <SelectField
             name="problemType"
             label="题目类型"
@@ -242,7 +317,7 @@ export default async function SolutionsPage({
             name="keyword"
             label="关键词"
             value={filters.keyword}
-            placeholder="搜索题目 / 来源"
+            placeholder="搜索题目 / 答案 / 解析"
           />
           <div className="flex items-end gap-3">
             <button
@@ -271,25 +346,20 @@ export default async function SolutionsPage({
           <div className="space-y-4">
             {filteredRows.map((row) => (
               <article
-                key={row.id}
+                key={`${row.solutionType}:${row.id}`}
                 className="rounded-md border border-ink/10 bg-white p-5 shadow-sm"
               >
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge text={getSourceTypeLabel(row.source_type)} />
-                      <Badge text={getProblemTypeLabel(row.problem_type)} />
-                      <Badge
-                        text={hasContent(row.answer) ? "答案已填" : "待补答案"}
-                      />
-                      <Badge
-                        text={
-                          hasContent(row.analysis) ? "解析已填" : "待补解析"
-                        }
-                      />
+                      <Badge text={getSourceTypeLabel(row.sourceType)} />
+                      <Badge text={getProblemTypeLabel(row.problemType)} />
+                      <Badge text={row.isInProblemLibrary ? "已加入题库" : "未加入题库"} />
+                      <Badge text={hasContent(row.answer) ? "答案已填" : "待补答案"} />
+                      <Badge text={hasContent(row.analysis) ? "解析已填" : "待补解析"} />
                     </div>
                     <div className="mt-3 rounded-md bg-paper p-4">
-                      <LatexProblemRenderer rawLatex={row.raw_latex} />
+                      <LatexProblemRenderer rawLatex={row.rawLatex} />
                     </div>
                   </div>
 
@@ -303,34 +373,49 @@ export default async function SolutionsPage({
                       {row.questionType?.level3 ?? "题目"}
                     </h2>
                     <p className="mt-3 text-sm text-ink/60">
-                      提交人：{getSubmitterLabel(row.submitter, row.created_by)}
+                      提交人：{getSubmitterLabel(row.submitter, row.createdBy)}
                     </p>
                     <p className="mt-1 text-sm text-ink/60">
-                      更新时间：{formatDateTime(row.updated_at)}
+                      更新时间：{formatDateTime(row.updatedAt)}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Link
-                        href={`/teacher/solutions/${row.id}`}
+                        href={`/teacher/solutions/${row.routeId}`}
                         className="inline-flex h-9 items-center gap-2 rounded-md bg-moss px-3 text-sm font-medium text-white"
                       >
                         <FilePenLine className="h-4 w-4" />
-                        编辑答案
+                        编辑答案解析
                       </Link>
-                      <Link
-                        href={`/teacher/solutions/${row.id}`}
-                        className="inline-flex h-9 items-center gap-2 rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink"
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                        查看答案
-                      </Link>
-                      <CopyLatexButton rawLatex={row.raw_latex} />
+                      {row.solutionType === "mistake" ? (
+                        <form action={addMistakeToProblemLibrary}>
+                          <input type="hidden" name="mistakeId" value={row.id} />
+                          <button
+                            type="submit"
+                            className="inline-flex h-9 items-center gap-2 rounded-md border border-moss/20 bg-moss/10 px-3 text-sm font-medium text-moss"
+                          >
+                            <LibraryBig className="h-4 w-4" />
+                            加入教师题库
+                          </button>
+                        </form>
+                      ) : null}
+                      <CopyLatexButton
+                        rawLatex={row.rawLatex}
+                        label="复制题目 LaTeX"
+                      />
+                      <CopyLatexButton
+                        rawLatex={row.answer}
+                        label="复制答案 LaTeX"
+                      />
+                      <CopyLatexButton
+                        rawLatex={row.analysis}
+                        label="复制解析 LaTeX"
+                      />
                       <details>
-                        <summary className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink">
-                          <Copy className="h-4 w-4" />
-                          raw_latex
+                        <summary className="inline-flex h-9 cursor-pointer items-center rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink">
+                          查看源码
                         </summary>
                         <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-paper p-3 font-mono text-xs leading-5 text-ink/70">
-                          {row.raw_latex}
+                          {buildSourcePreview(row)}
                         </pre>
                       </details>
                     </div>
@@ -408,11 +493,15 @@ function TextField({
 }
 
 function Badge({ text }: { text: string }) {
-  return <span className="rounded-md bg-paper px-2 py-1 text-xs text-ink/65">{text}</span>;
+  return (
+    <span className="rounded-md bg-paper px-2 py-1 text-xs text-ink/65">
+      {text}
+    </span>
+  );
 }
 
 async function getSubmitters(rows: SolutionRow[]) {
-  const ids = unique(rows.map((row) => row.created_by).filter(Boolean));
+  const ids = unique(rows.map((row) => row.createdBy).filter(Boolean));
   const submitters = new Map<string, ProfileRow>();
 
   if (ids.length === 0) {
@@ -432,14 +521,53 @@ async function getSubmitters(rows: SolutionRow[]) {
   return submitters;
 }
 
-function normalizeProblems(rows: ProblemRow[]): SolutionRow[] {
+function normalizeProblemRows(rows: ProblemRow[]): SolutionRow[] {
   return rows.map((row) => ({
-    ...row,
-    questionType: Array.isArray(row.question_types)
-      ? (row.question_types[0] ?? null)
-      : row.question_types,
+    id: row.id,
+    routeId: row.id,
+    solutionType: "problem",
+    createdBy: row.created_by,
+    questionTypeId: row.question_type_id,
+    problemType: row.problem_type,
+    rawLatex: row.raw_latex,
+    normalizedText: row.normalized_text,
+    answer: row.answer,
+    analysis: row.analysis,
+    source: row.source,
+    sourceType: row.source_type,
+    sourceMistakeId: row.source_mistake_id,
+    isInProblemLibrary: true,
+    updatedAt: row.updated_at,
+    questionType: normalizeQuestionType(row.question_types),
     submitter: null
   }));
+}
+
+function normalizeMistakeRows(
+  rows: MistakeRow[],
+  problemMistakeIds: Set<string>
+): SolutionRow[] {
+  return rows
+    .filter((row) => !problemMistakeIds.has(row.id))
+    .map((row) => ({
+      id: row.id,
+      routeId: `mistake_${row.id}`,
+      solutionType: "mistake",
+      createdBy: row.user_id,
+      questionTypeId: row.question_type_id,
+      problemType: row.problem_type,
+      rawLatex: row.raw_latex || row.latex_content || row.stem,
+      normalizedText: row.normalized_stem,
+      answer: row.answer,
+      analysis: row.analysis,
+      source: row.source,
+      sourceType: "student_submitted",
+      sourceMistakeId: row.id,
+      isInProblemLibrary: false,
+      updatedAt: row.updated_at,
+      questionType: normalizeQuestionType(row.question_types),
+      submitter: null
+    }));
 }
 
 function filterRows(
@@ -448,6 +576,7 @@ function filterRows(
     problemType: string;
     level1: string;
     level2: string;
+    level3: string;
     questionTypeId: string;
     answerStatus: string;
     analysisStatus: string;
@@ -460,11 +589,11 @@ function filterRows(
   const keyword = filters.keyword.trim().toLowerCase();
 
   return rows.filter((row) => {
-    if (filters.problemType && row.problem_type !== filters.problemType) {
+    if (filters.problemType && row.problemType !== filters.problemType) {
       return false;
     }
 
-    if (filters.questionTypeId && row.question_type_id !== filters.questionTypeId) {
+    if (filters.questionTypeId && row.questionTypeId !== filters.questionTypeId) {
       return false;
     }
 
@@ -476,7 +605,11 @@ function filterRows(
       return false;
     }
 
-    if (filters.sourceType && row.source_type !== filters.sourceType) {
+    if (filters.level3 && row.questionType?.level3 !== filters.level3) {
+      return false;
+    }
+
+    if (filters.sourceType && row.sourceType !== filters.sourceType) {
       return false;
     }
 
@@ -499,7 +632,7 @@ function filterRows(
     if (submitterFilter) {
       const submitterText = `${row.submitter?.full_name ?? ""} ${
         row.submitter?.email ?? ""
-      } ${row.created_by ?? ""}`.toLowerCase();
+      } ${row.createdBy ?? ""}`.toLowerCase();
 
       if (!submitterText.includes(submitterFilter)) {
         return false;
@@ -507,9 +640,9 @@ function filterRows(
     }
 
     if (keyword) {
-      const searchable = `${row.raw_latex} ${row.normalized_text ?? ""} ${
-        row.source ?? ""
-      }`.toLowerCase();
+      const searchable = `${row.rawLatex} ${row.normalizedText ?? ""} ${
+        row.answer ?? ""
+      } ${row.analysis ?? ""} ${row.source ?? ""}`.toLowerCase();
 
       if (!searchable.includes(keyword)) {
         return false;
@@ -527,12 +660,31 @@ function buildStats(rows: SolutionRow[]) {
     completed: rows.filter(
       (row) => hasContent(row.answer) && hasContent(row.analysis)
     ).length,
-    teacherCreated: rows.filter((row) => row.source_type === "teacher_created")
+    teacherCreated: rows.filter((row) => row.sourceType === "teacher_created")
       .length,
     studentSubmitted: rows.filter(
-      (row) => row.source_type === "student_submitted"
+      (row) => row.sourceType === "student_submitted"
     ).length
   };
+}
+
+function buildSourcePreview(row: SolutionRow) {
+  return [
+    "raw_latex:",
+    row.rawLatex,
+    "",
+    "answer:",
+    row.answer ?? "",
+    "",
+    "analysis:",
+    row.analysis ?? ""
+  ].join("\n");
+}
+
+function normalizeQuestionType(
+  value: QuestionTypeRow | QuestionTypeRow[] | null
+) {
+  return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
 function hasContent(value: string | null) {
@@ -555,11 +707,11 @@ function getSubmitterLabel(profile: ProfileRow | null, userId: string | null) {
   return userId ? `${userId.slice(0, 8)}...` : "未知";
 }
 
-function getSourceTypeLabel(value: ProblemRow["source_type"]) {
+function getSourceTypeLabel(value: SolutionRow["sourceType"]) {
   return value === "student_submitted" ? "学生提交" : "教师录入";
 }
 
-function getProblemTypeLabel(value: ProblemRow["problem_type"]) {
+function getProblemTypeLabel(value: SolutionRow["problemType"]) {
   if (value === "single_choice") {
     return "单选题";
   }

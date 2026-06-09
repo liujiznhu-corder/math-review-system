@@ -2,11 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
-  classifyQuestion,
-  type ClassifierQuestionType
+  classifyQuestion
 } from "@/services/classifier";
 import {
   getClassificationText,
@@ -14,6 +12,7 @@ import {
 } from "@/services/latex";
 import { normalizeLatexProblem } from "@/services/latex-normalizer";
 import { createReviewTasksForMistake } from "@/app/(app)/reviews/actions";
+import { getStudentClassifierQuestionTypes } from "@/services/student/mistakes";
 
 export type RecommendedQuestionType = {
   questionTypeId: string;
@@ -22,25 +21,6 @@ export type RecommendedQuestionType = {
   level3: string;
   score: number;
   reasons: string[];
-};
-
-export type SelectableQuestionType = {
-  id: string;
-  level1: string;
-  level2: string;
-  level3: string;
-};
-
-type QuestionTypeFromDb = {
-  id: string;
-  level1: string;
-  level2: string;
-  level3: string;
-  keywords: string[] | null;
-  question_type_examples: {
-    id: string;
-    example_text: string;
-  }[];
 };
 
 export async function recommendQuestionTypes({
@@ -71,34 +51,7 @@ export async function recommendQuestionTypes({
     redirect("/login");
   }
 
-  const { data, error } = await supabase
-    .from("question_types")
-    .select(
-      "id, level1, level2, level3, keywords, question_type_examples(id, example_text)"
-    )
-    .eq("is_active", true)
-    .order("level1", { ascending: true })
-    .order("level2", { ascending: true })
-    .order("level3", { ascending: true });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const questionTypes = ((data ?? []) as QuestionTypeFromDb[]).map(
-    (questionType): ClassifierQuestionType => ({
-      id: questionType.id,
-      level1: questionType.level1,
-      level2: questionType.level2,
-      level3: questionType.level3,
-      keywords: questionType.keywords ?? [],
-      examples: questionType.question_type_examples.map((example) => ({
-        id: example.id,
-        questionTypeId: questionType.id,
-        exampleText: example.example_text
-      }))
-    })
-  );
+  const questionTypes = await getStudentClassifierQuestionTypes();
 
   const questionTypeMap = new Map(
     questionTypes.map((questionType) => [questionType.id, questionType])
@@ -186,20 +139,6 @@ export async function saveMistake(formData: FormData) {
   }
 
   if (!submitForReview) {
-    await createStudentSubmittedProblem({
-      mistakeId: mistake.id,
-      userId: user.id,
-      questionTypeId,
-      problemType: "calculation",
-      rawLatex: inputType === "latex" ? latexContent : stem,
-      normalizedText:
-        inputType === "latex" ? (normalizedProblem?.plainText ?? stem) : stem,
-      optionsJson:
-        inputType === "latex" && normalizedProblem?.options
-          ? normalizedProblem.options
-          : null,
-      source: null
-    });
     await createReviewTasksForMistake(mistake.id);
   }
 
@@ -210,45 +149,6 @@ export async function saveMistake(formData: FormData) {
       "/mistakes",
       submitForReview ? "错题已提交教师审核" : "错题已保存"
     )
-  );
-}
-
-async function createStudentSubmittedProblem({
-  mistakeId,
-  userId,
-  questionTypeId,
-  problemType,
-  rawLatex,
-  normalizedText,
-  optionsJson,
-  source
-}: {
-  mistakeId: string;
-  userId: string;
-  questionTypeId: string;
-  problemType: "calculation";
-  rawLatex: string;
-  normalizedText: string;
-  optionsJson: unknown;
-  source: string | null;
-}) {
-  const admin = createAdminClient();
-
-  await admin.from("problems").upsert(
-    {
-      created_by: userId,
-      question_type_id: questionTypeId,
-      problem_type: problemType,
-      raw_latex: rawLatex,
-      normalized_text: normalizedText,
-      options_json: optionsJson,
-      source,
-      source_type: "student_submitted",
-      source_mistake_id: mistakeId
-    },
-    {
-      onConflict: "source_mistake_id"
-    }
   );
 }
 

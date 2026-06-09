@@ -8,7 +8,7 @@
 
 1. 教师或管理员维护数学题型库。
 2. 学生手动录入错题，支持普通文本和 LaTeX。
-3. 系统基于题型关键词和例题相似度推荐 top 3 题型。
+3. 系统基于题型识别特征和代表例题相似度推荐 top 3 题型。
 4. 学生可自行确认题型，也可提交教师审核。
 5. 错题最终确认题型后生成复习任务。
 6. 学生在今日复习页完成周期复习。
@@ -76,6 +76,8 @@ app/
     reviews/page.tsx
     reviews/actions.ts
     reviews/today/page.tsx
+    weak-practice/page.tsx
+    weak-practice/actions.ts
 ```
 
 职责：
@@ -142,6 +144,7 @@ services/classifier.ts
 services/latex.ts
 services/latex-normalizer.ts
 services/latex-exporter.ts
+services/weak-practice.ts
 ```
 
 职责：
@@ -168,6 +171,7 @@ supabase/migrations/202606090007_review_tasks_module.sql
 supabase/migrations/202606090008_add_knowledge_mastery_dashboard.sql
 supabase/migrations/202606090009_add_native_latex_problems.sql
 supabase/migrations/202606090010_fix_problems_table_and_dashboard.sql
+supabase/migrations/202606100001_add_weak_practice_tasks.sql
 ```
 
 职责：
@@ -316,9 +320,12 @@ docs/ARCHITECTURE.md
 
 页面作用：
 
-- 题型库管理。
-- 维护一级分类、二级分类、三级题型、关键词、例题和备注。
-- 错题推荐时从这里读取题型和例题。
+- 题型库列表页。
+- 支持一级分类、二级分类、三级题型级联筛选。
+- 支持启用状态筛选和题型 / 识别特征 / 说明 / 例题搜索。
+- 支持删除题型。
+- 提供跳转到 `/question-types/new` 和 `/question-types/[id]/edit` 的入口。
+- 不再承载新增或编辑表单。
 
 访问权限：
 
@@ -328,7 +335,53 @@ docs/ARCHITECTURE.md
 
 使用的 Server Actions：
 
-- `saveQuestionType(formData)`
+- `deleteQuestionType(formData)`
+
+## `/question-types/new`
+
+文件：
+
+- `app/(app)/question-types/new/page.tsx`
+- `components/question-types/QuestionTypeForm.tsx`
+- `app/(app)/question-types/actions.ts`
+
+页面作用：
+
+- 专门新增题型。
+- 表单字段包括一级分类、二级分类、三级题型、题型说明 / 适用场景、题型识别特征、代表例题和启用状态。
+- 代表例题支持 LaTeX 输入、实时预览、添加多道和删除。
+
+访问权限：
+
+- 只有 `teacher` / `admin` 可访问。
+- 学生访问会被重定向到 `/dashboard`。
+
+使用的 Server Actions：
+
+- `createQuestionType(formData)`
+
+## `/question-types/[id]/edit`
+
+文件：
+
+- `app/(app)/question-types/[id]/edit/page.tsx`
+- `components/question-types/QuestionTypeForm.tsx`
+- `app/(app)/question-types/actions.ts`
+
+页面作用：
+
+- 专门编辑单个题型。
+- 读取指定 `question_types` 记录和 `question_type_examples`。
+- 复用新增页表单，支持修改题型路径、题型说明、识别特征、代表例题和启用状态。
+
+访问权限：
+
+- 只有 `teacher` / `admin` 可访问。
+- 学生访问会被重定向到 `/dashboard`。
+
+使用的 Server Actions：
+
+- `updateQuestionType(formData)`
 - `deleteQuestionType(formData)`
 
 ## `/mistakes`
@@ -604,8 +657,8 @@ docs/ARCHITECTURE.md
 | `level1` | `text` | 一级分类 |
 | `level2` | `text` | 二级分类 |
 | `level3` | `text` | 三级题型 |
-| `keywords` | `text[]` | 分类关键词 |
-| `description` | `text` | 备注说明 |
+| `keywords` | `text[]` | 题型识别特征。字段名保留为 `keywords` 以兼容既有 schema 和 classifier |
+| `description` | `text` | 题型说明 / 适用场景 |
 | `is_active` | `boolean` | 是否启用，默认 `true` |
 | `created_by` | `uuid` | 创建人，默认 `auth.uid()` |
 | `created_at` | `timestamptz` | 创建时间 |
@@ -632,7 +685,7 @@ docs/ARCHITECTURE.md
 
 业务作用：
 
-- 存储每个题型的例题。
+- 存储每个题型的代表例题，当前支持 LaTeX 源码输入和页面实时预览。
 - classifier 使用例题文本计算相似度。
 
 字段：
@@ -641,8 +694,8 @@ docs/ARCHITECTURE.md
 | --- | --- | --- |
 | `id` | `uuid` | 主键 |
 | `question_type_id` | `uuid` | 所属题型 |
-| `example_text` | `text` | 例题文本 |
-| `solution_hint` | `text` | 解题提示，当前页面未重点使用 |
+| `example_text` | `text` | 代表例题 LaTeX 源码 |
+| `solution_hint` | `text` | 例题提示 / 解题入口 |
 | `created_by` | `uuid` | 创建人 |
 | `created_at` | `timestamptz` | 创建时间 |
 | `updated_at` | `timestamptz` | 更新时间 |
@@ -958,10 +1011,10 @@ classifyQuestion({
    - 转小写。
    - 去空白。
    - 去常见中英文标点。
-2. 关键词匹配：
-   - 遍历 `question_types.keywords`。
-   - 题干包含关键词时加 4 分。
-   - 记录理由：`关键词：xxx`。
+2. 识别特征匹配：
+   - 遍历 `question_types.keywords`。产品语义上这里是“题型识别特征”，暂不改数据库字段名。
+   - 题干包含识别特征时加 4 分。
+   - 记录理由：`识别特征：xxx`。
 3. 例题相似度：
    - 对题干和例题做字符 unigram 与 bigram token。
    - 使用 Jaccard similarity。
@@ -1026,7 +1079,7 @@ flowchart TD
   A["学生进入 /mistakes/new"] --> B["输入错题题干<br/>普通文本或 LaTeX"]
   B --> C["点击智能推荐题型"]
   C --> D["读取 question_types<br/>读取 question_type_examples"]
-  D --> E["services/classifier.ts<br/>关键词 + 例题相似度"]
+  D --> E["services/classifier.ts<br/>识别特征 + 例题相似度"]
   E --> F["返回 top 3 推荐题型"]
 
   F --> G{"学生是否确定题型？"}
@@ -1200,8 +1253,8 @@ app/(app)/reviews/actions.ts
   - 新增
   - 编辑
   - 删除
-  - 关键词
-  - 例题
+  - 题型识别特征
+  - 支持 LaTeX 预览的代表例题
 - 错题录入：
   - 普通文本
   - LaTeX
@@ -1210,7 +1263,7 @@ app/(app)/reviews/actions.ts
   - 手动选择已有题型
   - 提交教师审核
 - 分类服务：
-  - 关键词匹配
+  - 识别特征匹配
   - 例题相似度
   - LaTeX 清洗后分类
 - 教师审核：
@@ -1267,14 +1320,15 @@ app/(app)/reviews/actions.ts
 
 - `student`：使用普通 Supabase server client 读取自己的 `mistakes` 记录，依赖 RLS 和 `user_id` 条件保护。
 - `teacher` / `admin`：先通过 `profiles.role` 判断角色，再使用 service role server client 读取任意错题，避免被学生侧 RLS 限制。
-- 页面展示题目、答案 `mistakes.answer`、解析 `mistakes.analysis`、教师备注 `mistakes.teacher_note`。
+- 页面展示题目、答案、解析和教师备注。答案读取优先级为关联 `problems.answer` / `problems.analysis`，没有关联 problem 时兼容读取 `mistakes.answer` / `mistakes.analysis`。
 - 如果答案解析为空，显示“答案解析暂未补充，请等待老师更新。”
 
 教师维护入口：
 
-- `/teacher/solutions`：答案解析中心列表页，统一展示教师录入题目和学生已确认错题沉淀出的题目。
-- `/teacher/solutions/[id]`：答案解析编辑页，维护 `problems.answer` 和 `problems.analysis`，并使用 LaTeX 预览。
-- `/teacher/review-mistakes`：审核 pending 错题时确认题型；确认后服务端自动创建或更新 `source_type = student_submitted` 的 `problems` 记录。
+- `/teacher/solutions`：答案解析中心列表页，统一展示教师题库 `problems` 和已确认题型但尚未加入题库的学生错题 `mistakes`。
+- `/teacher/solutions/[id]`：答案解析编辑页，普通 problem 使用 UUID 路由，未加入题库的学生错题使用 `mistake_<id>` 路由；保存时分别维护 `problems.answer` / `problems.analysis` 或 `mistakes.answer` / `mistakes.analysis`，并使用 LaTeX 实时预览。
+- `/teacher/solutions` 中学生错题可点击“加入教师题库”，通过 service role 创建 `source_type = student_submitted` 的 `problems` 记录，并用 `source_mistake_id` 避免重复加入。
+- `/teacher/review-mistakes`：审核 pending 错题时只确认题型、教师备注和可选答案解析；确认后不自动创建 `problems`，题库沉淀只在答案解析中心由教师手动触发。
 - `/teacher/problems` 和 `/teacher/problems/new`：只负责题目录入、题型归类、raw_latex 和来源信息，不再维护答案解析。
 
 答案解析中心统计：
@@ -1295,7 +1349,7 @@ app/(app)/reviews/actions.ts
 - 解析是否已填写。
 - 来源类型：教师录入 / 学生提交。
 - 提交人姓名、邮箱或用户 ID。
-- 关键词搜索 `raw_latex`、`normalized_text`、`source`。
+- 关键词搜索 `raw_latex`、`normalized_text`、`answer`、`analysis`、`source`。
 
 `problems` 来源追溯字段：
 
@@ -1308,10 +1362,160 @@ app/(app)/reviews/actions.ts
 1. 优先读取 `problems.source_mistake_id = mistakes.id` 的 `answer` / `analysis`。
 2. 如果没有关联 problem，则兼容读取 `mistakes.answer` / `mistakes.analysis`。
 
+教师题库 `/teacher/problems` 可查看并复制题目 `raw_latex`、答案 `answer` 和解析 `analysis` 源码；题目录入页仍只负责题目和题型，不承载答案解析维护。
+
 LaTeX 渲染：
 
 - 题目继续使用 `components/problems/LatexProblemRenderer.tsx`。
 - 答案和解析使用 `components/problems/LatexContentRenderer.tsx`，内部复用 `LatexPreview`，并对裸 `cases/aligned/matrix` 等 display environment 做安全包裹后交给 KaTeX 渲染。
+
+---
+
+# 当前补充说明：学生端小程序迁移预留
+
+未来产品形态：
+
+- 教师端继续使用当前 Next.js Web。
+- 学生端未来迁移到微信小程序。
+- 当前 Next.js 学生页面继续保留，作为小程序原型和 Web 验证入口。
+
+为降低后续迁移成本，学生端数据读取逻辑已从页面拆到 `services/student/`：
+
+- `services/student/dashboard.ts`
+  - 学生 Dashboard 数据聚合。
+  - 今日待复习、今日已完成、完成率、连续复习天数、薄弱题型、知识点掌握度、最近复习记录、30 天复习时间轴。
+- `services/student/mistakes.ts`
+  - 学生错题库列表数据。
+  - 学生录入页可选题型。
+  - 分类推荐所需题型与例题读取。
+- `services/student/reviews.ts`
+  - 今日复习任务读取。
+  - 今日已完成复习数量。
+- `services/student/solutions.ts`
+  - 学生错题答案页数据。
+  - 优先读取关联 `problems` 的答案解析，兼容 `mistakes` 旧字段。
+
+页面职责调整：
+
+- `app/(app)/dashboard/page.tsx`
+- `app/(app)/mistakes/page.tsx`
+- `app/(app)/mistakes/new/page.tsx`
+- `app/(app)/mistakes/[id]/answer/page.tsx`
+- `app/(app)/reviews/page.tsx`
+
+这些学生页面只负责登录态/角色保护、调用 service、渲染 UI。业务查询和数据归一化集中在 `services/student/`。
+
+小程序迁移建议：
+
+- 第一阶段可以让小程序调用 Next.js Route Handlers，由 Route Handlers 复用 `services/student/*`。
+- 第二阶段如果改为小程序直连 Supabase，需要把 `services/student/*` 中的返回数据结构作为 API 契约参考。
+- 教师端的题型库、错题审核、教师题库、答案解析中心继续保留在 Next.js Web，不迁移到小程序。
+
+小程序迁移预留本身没有修改数据库 schema；后续“薄弱巩固 V1”新增了独立训练任务表。
+
+---
+
+# 当前补充说明：薄弱巩固 V1
+
+学生端新增 `/weak-practice`，文件为：
+
+```text
+app/(app)/weak-practice/page.tsx
+app/(app)/weak-practice/actions.ts
+services/weak-practice.ts
+services/student/weak-practice.ts
+```
+
+页面作用：
+
+- 学生每天进入 `/weak-practice` 查看 5 道薄弱巩固题。
+- 题目来源为教师题库 `problems`，只抽取 `question_type_id` 不为空的题目。
+- 页面使用 `LatexProblemRenderer` 展示题目，使用 `LatexContentRenderer` 展示答案和解析。
+- 学生可提交“已完成”或“仍需巩固”，写入 `weak_practice_tasks.status/result/completed_at`。
+
+推荐逻辑：
+
+```text
+WeaknessScore = 错题数量 * 0.5 + 复习未掌握次数 * 0.3 + 最近7天错题数量 * 0.2
+```
+
+- 3 题来自 TopK 薄弱题型。
+- 1 题来自次薄弱题型。
+- 1 题来自随机挑战。
+- 优先抽取已有 `answer` 或 `analysis` 的题目。
+- 同一天通过 `user_id + practice_date + problem_id` 避免重复抽同题。
+- 若薄弱题型题库不足，会用其他题型或随机题补足。
+
+数据库新增表：
+
+```text
+weak_practice_tasks
+```
+
+核心字段：
+
+- `user_id`：学生。
+- `problem_id`：教师题库题目。
+- `question_type_id`：题型。
+- `practice_date`：训练日期。
+- `source_type`：`weak` / `secondary` / `random`。
+- `status`：`pending` / `completed`。
+- `result`：`mastered` / `not_mastered` / `null`。
+
+RLS：
+
+- 学生只能 `select/insert/update` 自己的 `weak_practice_tasks`。
+- teacher/admin 暂不管理该表。
+
+导航与 Dashboard：
+
+- 学生导航新增“薄弱巩固”，链接到 `/weak-practice`。
+- teacher/admin 不显示该入口，访问 `/weak-practice` 会被 `redirectTeacherToDashboard()` 重定向到 `/teacher/dashboard`。
+- 学生 `/dashboard` 快捷入口新增“今日薄弱巩固”，展示今日 5 题和已完成数量。
+
+小程序迁移预留：
+
+- 核心推荐在 `services/weak-practice.ts`。
+- 学生页面聚合在 `services/student/weak-practice.ts`。
+- 未来小程序可通过 Route Handler 复用这两个 service，或以其返回结构作为直连 Supabase 的接口契约。
+
+---
+
+# 当前补充说明：题型级联筛选
+
+题型筛选统一使用：
+
+```text
+components/question-types/CascadingQuestionTypeFilters.tsx
+components/question-types/QuestionTypeForm.tsx
+components/question-types/DeleteQuestionTypeButton.tsx
+```
+
+组件职责：
+
+- 接收 `questionTypes`、`selectedLevel1`、`selectedLevel2`、`selectedLevel3` 和可选 `selectedQuestionTypeId`。
+- 根据当前选择动态计算一级、二级、三级题型可选项。
+- 选择一级分类后，二级分类和三级题型只展示该一级分类下的数据。
+- 选择二级分类后，三级题型只展示该二级分类下的数据。
+- 一级分类变化时，如果当前二级分类不属于新一级分类，会自动清空二级分类和三级题型。
+- 二级分类变化时，如果当前三级题型不属于新二级分类，会自动清空三级题型。
+
+URL 参数约定：
+
+- 新级联筛选提交 `level1`、`level2`、`level3`。
+- 为兼容旧页面逻辑，组件可同步隐藏字段 `questionTypeId`。
+
+当前使用页面：
+
+- `/teacher/problems`
+- `/teacher/solutions`
+- `/mistakes`
+- `/question-types`
+
+题型库 CRUD 组件：
+
+- `components/question-types/QuestionTypeForm.tsx`：新增页和编辑页共用表单，负责题型路径、说明、识别特征、代表例题 LaTeX 预览和启用状态。
+- `components/question-types/DeleteQuestionTypeButton.tsx`：列表页删除按钮，提交前使用浏览器 confirm 防误删。
   - 教师备注
   - 复习摘要
 - Supabase schema 和 migrations。

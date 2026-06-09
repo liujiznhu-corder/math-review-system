@@ -73,29 +73,18 @@ export async function confirmMistakeQuestionType(formData: FormData) {
         problemType === "single_choice" && normalizedProblem?.options
           ? normalizedProblem.options
           : null
-    })
-    .eq("id", mistakeId)
-    .eq("classification_status", "pending")
-    .select(
-      "id, user_id, question_type_id, problem_type, raw_latex, latex_content, stem, normalized_stem, normalized_text, options_json, answer, analysis, source, created_at, updated_at"
-    )
-    .single();
+  })
+  .eq("id", mistakeId)
+  .eq("classification_status", "pending")
+  .select(
+    "id, user_id, question_type_id, problem_type, raw_latex, latex_content, stem, normalized_stem, options_json, answer, analysis, source, created_at, updated_at"
+  )
+  .single();
 
   if (updateError) {
     redirect(
       `/teacher/review-mistakes?message=${encodeURIComponent(
         `update mistakes failed: ${formatSupabaseError(updateError)}`
-      )}`
-    );
-  }
-
-  const solutionResult = await upsertStudentSubmittedProblem(updatedMistake);
-
-  if (!solutionResult.ok) {
-    revalidatePath("/teacher/review-mistakes");
-    redirect(
-      `/teacher/review-mistakes?message=${encodeURIComponent(
-        `update mistakes succeeded, create solution problem failed: ${solutionResult.message}`
       )}`
     );
   }
@@ -121,61 +110,6 @@ export async function confirmMistakeQuestionType(formData: FormData) {
       "update mistakes succeeded, insert review_tasks succeeded"
     )
   );
-}
-
-async function upsertStudentSubmittedProblem(mistake: {
-  id: string;
-  user_id: string;
-  question_type_id: string | null;
-  problem_type: ProblemType;
-  raw_latex: string | null;
-  latex_content: string | null;
-  stem: string;
-  normalized_stem: string | null;
-  normalized_text?: string | null;
-  options_json: unknown;
-  answer: string | null;
-  analysis: string | null;
-  source: string | null;
-  created_at: string;
-  updated_at: string;
-}) {
-  const admin = createAdminClient();
-  const rawLatex = mistake.raw_latex || mistake.latex_content || mistake.stem;
-  const normalizedText =
-    mistake.normalized_stem ?? mistake.normalized_text ?? mistake.stem;
-  const { error } = await admin.from("problems").upsert(
-    {
-      created_by: mistake.user_id,
-      question_type_id: mistake.question_type_id,
-      problem_type: mistake.problem_type,
-      raw_latex: rawLatex,
-      normalized_text: normalizedText,
-      options_json: mistake.options_json,
-      answer: mistake.answer,
-      analysis: mistake.analysis,
-      source: mistake.source,
-      source_type: "student_submitted",
-      source_mistake_id: mistake.id,
-      created_at: mistake.created_at,
-      updated_at: mistake.updated_at
-    },
-    {
-      onConflict: "source_mistake_id"
-    }
-  );
-
-  if (error) {
-    return {
-      ok: false,
-      message: formatSupabaseError(error)
-    };
-  }
-
-  return {
-    ok: true,
-    message: "solution problem upserted"
-  };
 }
 
 function normalizeOptionalString(value: FormDataEntryValue | null) {

@@ -5,10 +5,10 @@ import { CheckCircle2, Send, Save, Sparkles } from "lucide-react";
 import {
   recommendQuestionTypes,
   saveMistake,
-  type RecommendedQuestionType,
-  type SelectableQuestionType
+  type RecommendedQuestionType
 } from "@/app/(app)/mistakes/actions";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
+import type { SelectableQuestionType } from "@/services/student/mistakes";
 import type { MistakeInputType } from "@/services/latex";
 
 type MistakeEntryFormProps = {

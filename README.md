@@ -56,6 +56,7 @@ npm run dev
 - `question_type_examples`
 - `mistakes`
 - `review_tasks`
+- `weak_practice_tasks`
 - `review_records`
 
 当前权限模型：
@@ -164,7 +165,9 @@ npm run build
 /teacher/problems/new
 ```
 
-`/teacher/problems` 是教师题库列表，支持查看、复制、编辑、删除已录入题目，并可按题目类型、一级分类、二级分类、三级题型、来源和关键词筛选。`/question-types` 只管理题型，不显示具体题目。
+`/teacher/problems` 是教师题库列表，支持查看、复制、编辑、删除已录入题目，并可按题目类型、一级分类、二级分类、三级题型、来源和关键词筛选。题型库管理拆分为三个页面：`/question-types` 只负责列表、查询筛选、删除和跳转；`/question-types/new` 专门新增题型；`/question-types/[id]/edit` 专门编辑题型。
+
+`/question-types` 中的 `question_types.keywords` 字段在产品语义上已作为“题型识别特征”使用：页面以“一行一个识别特征”的 textarea 录入，保存时仍写入 `keywords text[]` 以兼容现有 schema 和 `services/classifier.ts`。代表例题保存到 `question_type_examples.example_text`，支持 LaTeX 输入和实时预览；`solution_hint` 用作“例题提示 / 解题入口”。
 
 支持三类题目：
 
@@ -187,6 +190,7 @@ components/problems/LatexProblemRenderer.tsx
 - `/mistakes/new`
 - `/mistakes`
 - `/reviews`
+- `/weak-practice`
 - `/teacher/review-mistakes`
 
 支持自定义命令：
@@ -262,8 +266,11 @@ supabase/migrations/202606090010_fix_problems_table_and_dashboard.sql
 答案解析由教师端“答案解析中心”统一维护：
 
 - `/teacher/solutions`：答案解析列表、筛选、统计和来源追溯。
-- `/teacher/solutions/[id]`：编辑某一道题的 `answer` 和 `analysis`，左侧输入、右侧实时预览。
-- `/teacher/review-mistakes`：审核学生错题后，系统会把已确认题型的错题沉淀为 `student_submitted` 来源的 problem，进入答案解析中心。
+- `/teacher/solutions` 同时展示教师题库 `problems` 和已确认题型但尚未加入题库的学生错题 `mistakes`。
+- `/teacher/solutions/[id]`：编辑某一道题的 `answer` 和 `analysis`，左侧输入、右侧实时预览；`answer` / `analysis` 字段原样保存教师输入的 LaTeX 或 Markdown + LaTeX 源码。
+- 学生错题如果尚未关联 `problems`，答案解析会先写入 `mistakes.answer` / `mistakes.analysis`，学生端可立即查看。
+- 教师觉得学生错题值得沉淀时，可在答案解析中心点击“加入教师题库”，系统会创建 `source_type = student_submitted` 的 problem，并通过 `source_mistake_id` 避免重复加入。
+- `/teacher/review-mistakes`：审核学生错题时只确认题型、教师备注和可选答案解析，不会自动创建 `problems`；已确认题型的学生错题会由答案解析中心兼容展示，是否加入教师题库由教师手动决定。
 - `/teacher/problems` 和 `/teacher/problems/new` 只负责题目录入与题型归类，不再维护答案解析。
 
 学生错题库 `/mistakes` 默认只展示题目、所属题型、分类状态和录入时间。点击“查看答案”进入 `/mistakes/[id]/answer`：
@@ -279,3 +286,36 @@ supabase/migrations/202606090010_fix_problems_table_and_dashboard.sql
 - `problems.source_type`：`teacher_created` / `student_submitted`
 - `problems.source_mistake_id`：学生错题沉淀为 problem 时记录原错题 ID
 - `problems.created_by`：教师录入时为教师用户 ID，学生提交时为学生用户 ID
+
+教师题库 `/teacher/problems` 可查看并复制题目 `raw_latex`、答案 `answer` 和解析 `analysis` 的源码；答案解析中心也提供题目、答案、解析源码复制按钮。
+
+## 薄弱巩固 V1
+
+学生端新增 `/weak-practice`。页面会按当天日期从教师题库 `problems` 中为当前学生生成最多 5 道训练题，并写入 `weak_practice_tasks`。
+
+推荐规则：
+
+- 3 题来自学生 TopK 薄弱题型。
+- 1 题来自次薄弱题型。
+- 1 题来自随机挑战。
+
+薄弱分数来自当前学生自己的 `mistakes` 和 `review_tasks`：
+
+```text
+WeaknessScore = 错题数量 * 0.5 + 复习未掌握次数 * 0.3 + 最近7天错题数量 * 0.2
+```
+
+抽题约束：
+
+- 只抽取 `problems.question_type_id` 不为空的题目。
+- 优先抽取已有 `answer` 或 `analysis` 的题目。
+- 同一天不会重复抽同一道题。
+- 若某个薄弱题型题库不足，会用其他薄弱题型或随机题补足。
+
+学生可在 `/weak-practice` 查看题目、展开答案解析，并提交“已完成”或“仍需巩固”。学生导航和 Dashboard 均提供“薄弱巩固”入口；教师端不显示该入口，访问会重定向到 `/teacher/dashboard`。
+
+上线时请执行：
+
+```text
+supabase/migrations/202606100001_add_weak_practice_tasks.sql
+```

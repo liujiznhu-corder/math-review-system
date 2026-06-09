@@ -1,7 +1,6 @@
-import { MistakeEntryForm } from "./mistake-entry-form";
-import { createClient } from "@/lib/supabase/server";
 import { redirectTeacherToDashboard } from "@/lib/roles";
-import type { SelectableQuestionType } from "@/app/(app)/mistakes/actions";
+import { getStudentSelectableQuestionTypes } from "@/services/student/mistakes";
+import { MistakeEntryForm } from "./mistake-entry-form";
 
 type NewMistakePageProps = {
   searchParams?: Promise<{
@@ -17,15 +16,7 @@ export default async function NewMistakePage({
   await redirectTeacherToDashboard();
 
   const params = await searchParams;
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("question_types")
-    .select("id, level1, level2, level3")
-    .eq("is_active", true)
-    .order("level1", { ascending: true })
-    .order("level2", { ascending: true })
-    .order("level3", { ascending: true });
-  const questionTypes = (data ?? []) as SelectableQuestionType[];
+  const questionTypes = await getStudentSelectableQuestionTypes();
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-6 py-8">
@@ -35,7 +26,7 @@ export default async function NewMistakePage({
           手动输入题干并推荐题型
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
-          当前不接 OCR 和 AI API。推荐逻辑仅使用题型库中的关键词与例题相似度，服务层后续可替换。
+          当前不接 OCR 和 AI API。推荐逻辑使用题型库中的识别特征与代表例题相似度，服务层后续可替换。
         </p>
       </div>
 

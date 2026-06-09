@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { CheckCircle2, Eye, XCircle } from "lucide-react";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
-import { createClient } from "@/lib/supabase/server";
 import { redirectTeacherToDashboard } from "@/lib/roles";
+import { completeReviewTask } from "@/app/(app)/reviews/actions";
 import {
-  completeReviewTask,
+  getCompletedTodayCount,
   getTodayReviewTasks
-} from "@/app/(app)/reviews/actions";
+} from "@/services/student/reviews";
 
 type ReviewsPageProps = {
   searchParams?: Promise<{
@@ -152,20 +152,6 @@ export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
       </section>
     </main>
   );
-}
-
-async function getCompletedTodayCount() {
-  const supabase = await createClient();
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-
-  const { count } = await supabase
-    .from("review_tasks")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "completed")
-    .gte("completed_at", startOfToday.toISOString());
-
-  return count ?? 0;
 }
 
 function getReviewRoundLabel(reviewRound: string) {

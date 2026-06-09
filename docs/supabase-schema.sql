@@ -105,6 +105,12 @@ alter table public.problems
 add constraint problems_source_mistake_id_fkey
 foreign key (source_mistake_id) references public.mistakes(id) on delete set null;
 
+comment on column public.problems.raw_latex is 'Original problem LaTeX source. Keep unchanged for future export.';
+comment on column public.problems.answer is 'Original answer source, usually plain text or LaTeX. Keep unchanged for copy/export.';
+comment on column public.problems.analysis is 'Original analysis source, Markdown plus LaTeX. Keep unchanged for copy/export.';
+comment on column public.mistakes.answer is 'Teacher-maintained fallback answer source for student-submitted mistakes not yet linked to problems.';
+comment on column public.mistakes.analysis is 'Teacher-maintained fallback analysis source for student-submitted mistakes not yet linked to problems.';
+
 create table if not exists public.review_tasks (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
@@ -123,6 +129,24 @@ create table if not exists public.review_tasks (
   constraint review_tasks_status_check check (status in ('pending', 'completed', 'skipped')),
   constraint review_tasks_result_check check (result is null or result in ('mastered', 'not_mastered')),
   constraint review_tasks_round_check check (review_round in ('day1', 'day3', 'day7', 'day14', 'day30', 'retry_day3', 'retry_day7'))
+);
+
+create table if not exists public.weak_practice_tasks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
+  problem_id uuid not null references public.problems(id) on delete cascade,
+  question_type_id uuid not null references public.question_types(id) on delete cascade,
+  practice_date date not null,
+  source_type text not null,
+  status text not null default 'pending',
+  result text,
+  completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint weak_practice_tasks_source_type_check check (source_type in ('weak', 'secondary', 'random')),
+  constraint weak_practice_tasks_status_check check (status in ('pending', 'completed')),
+  constraint weak_practice_tasks_result_check check (result is null or result in ('mastered', 'not_mastered')),
+  constraint weak_practice_tasks_unique_daily_problem unique (user_id, practice_date, problem_id)
 );
 
 create table if not exists public.knowledge_mastery (
@@ -172,6 +196,9 @@ create index if not exists mistakes_problem_type_idx on public.mistakes (problem
 create index if not exists review_tasks_user_due_idx on public.review_tasks (user_id, due_date, status);
 create index if not exists review_tasks_user_review_idx on public.review_tasks (user_id, review_date, status);
 create index if not exists review_tasks_mistake_idx on public.review_tasks (mistake_id);
+create index if not exists weak_practice_tasks_user_date_idx on public.weak_practice_tasks (user_id, practice_date, status);
+create index if not exists weak_practice_tasks_problem_idx on public.weak_practice_tasks (problem_id);
+create index if not exists weak_practice_tasks_question_type_idx on public.weak_practice_tasks (question_type_id);
 create index if not exists knowledge_mastery_user_idx on public.knowledge_mastery (user_id);
 create index if not exists knowledge_mastery_question_type_idx on public.knowledge_mastery (question_type_id);
 create index if not exists review_records_user_reviewed_idx on public.review_records (user_id, reviewed_at desc);
@@ -219,6 +246,11 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_review_tasks_updated_at on public.review_tasks;
 create trigger set_review_tasks_updated_at
 before update on public.review_tasks
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_weak_practice_tasks_updated_at on public.weak_practice_tasks;
+create trigger set_weak_practice_tasks_updated_at
+before update on public.weak_practice_tasks
 for each row execute function public.set_updated_at();
 
 drop trigger if exists set_knowledge_mastery_updated_at on public.knowledge_mastery;
@@ -339,6 +371,7 @@ alter table public.question_type_examples enable row level security;
 alter table public.problems enable row level security;
 alter table public.mistakes enable row level security;
 alter table public.review_tasks enable row level security;
+alter table public.weak_practice_tasks enable row level security;
 alter table public.knowledge_mastery enable row level security;
 alter table public.review_records enable row level security;
 
@@ -508,6 +541,25 @@ create policy "review_tasks_delete_own"
 on public.review_tasks for delete
 to authenticated
 using (user_id = auth.uid());
+
+drop policy if exists "weak_practice_tasks_select_own" on public.weak_practice_tasks;
+create policy "weak_practice_tasks_select_own"
+on public.weak_practice_tasks for select
+to authenticated
+using (user_id = auth.uid());
+
+drop policy if exists "weak_practice_tasks_insert_own" on public.weak_practice_tasks;
+create policy "weak_practice_tasks_insert_own"
+on public.weak_practice_tasks for insert
+to authenticated
+with check (user_id = auth.uid());
+
+drop policy if exists "weak_practice_tasks_update_own" on public.weak_practice_tasks;
+create policy "weak_practice_tasks_update_own"
+on public.weak_practice_tasks for update
+to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
 
 drop policy if exists "knowledge_mastery_select_own_or_admin_teacher" on public.knowledge_mastery;
 create policy "knowledge_mastery_select_own_or_admin_teacher"

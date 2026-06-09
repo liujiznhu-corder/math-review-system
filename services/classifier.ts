@@ -9,6 +9,8 @@ export type ClassifierQuestionType = {
   level1: string;
   level2: string;
   level3: string;
+  // Product wording: these are question-type recognition features.
+  // Database compatibility: they are still stored in question_types.keywords.
   keywords: string[];
   examples: ClassifierExample[];
 };
@@ -53,7 +55,7 @@ function scoreQuestionType(
 
     if (normalizedStem.includes(normalizedKeyword)) {
       score += 4;
-      reasons.push(`关键词：${keyword}`);
+      reasons.push(`识别特征：${keyword}`);
     }
   }
 

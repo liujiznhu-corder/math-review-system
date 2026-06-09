@@ -9,7 +9,8 @@ import {
   BookOpenCheck,
   ClipboardList,
   PenLine,
-  ShieldCheck
+  ShieldCheck,
+  Target
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/(app)/actions";
@@ -37,6 +38,11 @@ const studentNavigationItems = [
     href: "/reviews",
     label: "今日复习",
     icon: BookOpenCheck
+  },
+  {
+    href: "/weak-practice",
+    label: "薄弱巩固",
+    icon: Target
   }
 ];
 

@@ -1,36 +1,18 @@
 import Link from "next/link";
 import { Eye, Filter, Plus } from "lucide-react";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
-import { createClient } from "@/lib/supabase/server";
+import { CascadingQuestionTypeFilters } from "@/components/question-types/CascadingQuestionTypeFilters";
 import { redirectTeacherToDashboard } from "@/lib/roles";
-import type { Database } from "@/types/database";
-
-type QuestionTypeRow = Pick<
-  Database["public"]["Tables"]["question_types"]["Row"],
-  "id" | "level1" | "level2" | "level3"
->;
-
-type MistakeRow = Pick<
-  Database["public"]["Tables"]["mistakes"]["Row"],
-  | "id"
-  | "stem"
-  | "created_at"
-  | "question_type_id"
-  | "input_type"
-  | "raw_text"
-  | "raw_latex"
-  | "latex_content"
-  | "classification_status"
-> & {
-  question_types: QuestionTypeRow | null;
-};
-
-type MistakeRawRow = Omit<MistakeRow, "question_types"> & {
-  question_types: QuestionTypeRow | QuestionTypeRow[] | null;
-};
+import {
+  getStudentMistakesPageData,
+  type StudentMistakeListItem
+} from "@/services/student/mistakes";
 
 type MistakesPageProps = {
   searchParams?: Promise<{
+    level1?: string;
+    level2?: string;
+    level3?: string;
     questionTypeId?: string;
     message?: string;
   }>;
@@ -42,23 +24,18 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
   await redirectTeacherToDashboard();
 
   const params = await searchParams;
+  const selectedLevel1 = params?.level1 ?? "";
+  const selectedLevel2 = params?.level2 ?? "";
+  const selectedLevel3 = params?.level3 ?? "";
   const selectedQuestionTypeId = params?.questionTypeId ?? "";
-  const supabase = await createClient();
-
-  const [{ data: questionTypes }, mistakesResult] = await Promise.all([
-    supabase
-      .from("question_types")
-      .select("id, level1, level2, level3")
-      .eq("is_active", true)
-      .order("level1", { ascending: true })
-      .order("level2", { ascending: true })
-      .order("level3", { ascending: true }),
-    getMistakes(selectedQuestionTypeId)
-  ]);
-
-  const mistakes = normalizeMistakes(
-    (mistakesResult.data ?? []) as unknown as MistakeRawRow[]
+  const { questionTypes, mistakes: allMistakes, error } = await getStudentMistakesPageData(
+    selectedQuestionTypeId
   );
+  const mistakes = filterMistakesByPath(allMistakes, {
+    level1: selectedLevel1,
+    level2: selectedLevel2,
+    level3: selectedLevel3
+  });
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-6 py-8">
@@ -85,14 +62,24 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
         </p>
       ) : null}
 
-      {mistakesResult.error ? (
+      {error ? (
         <p className="mt-6 rounded-md border border-clay/30 bg-clay/10 px-4 py-3 text-sm text-clay">
-          {mistakesResult.error.message}
+          {error.message}
         </p>
       ) : null}
 
       <section className="mt-8 rounded-md border border-ink/10 bg-white p-5 shadow-sm">
         <form className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <CascadingQuestionTypeFilters
+            questionTypes={questionTypes}
+            selectedLevel1={selectedLevel1}
+            selectedLevel2={selectedLevel2}
+            selectedLevel3={selectedLevel3}
+            selectedQuestionTypeId={selectedQuestionTypeId}
+            hiddenQuestionTypeIdName="questionTypeId"
+            disableLegacyFields
+            className="grid flex-1 gap-3 sm:grid-cols-3"
+          />
           <label className="block flex-1 text-sm font-medium text-ink">
             <span className="inline-flex items-center gap-2">
               <Filter className="h-4 w-4 text-moss" />
@@ -104,7 +91,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
               className="mt-2 h-10 w-full rounded-md border border-ink/15 bg-white px-3 text-sm outline-none focus:border-moss"
             >
               <option value="">全部题型</option>
-              {(questionTypes ?? []).map((questionType) => (
+              {questionTypes.map((questionType) => (
                 <option key={questionType.id} value={questionType.id}>
                   {questionType.level1} / {questionType.level2} /{" "}
                   {questionType.level3}
@@ -118,7 +105,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
           >
             筛选
           </button>
-          {selectedQuestionTypeId ? (
+          {selectedQuestionTypeId || selectedLevel1 || selectedLevel2 || selectedLevel3 ? (
             <Link
               href="/mistakes"
               className="inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-ink/65 hover:text-ink"
@@ -199,31 +186,6 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
   );
 }
 
-function normalizeMistakes(rows: MistakeRawRow[]): MistakeRow[] {
-  return rows.map((row) => ({
-    ...row,
-    question_types: Array.isArray(row.question_types)
-      ? (row.question_types[0] ?? null)
-      : row.question_types
-  }));
-}
-
-async function getMistakes(questionTypeId: string) {
-  const supabase = await createClient();
-  let query = supabase
-    .from("mistakes")
-    .select(
-      "id, stem, created_at, question_type_id, input_type, raw_text, raw_latex, latex_content, classification_status, question_types(id, level1, level2, level3)"
-    )
-    .order("created_at", { ascending: false });
-
-  if (questionTypeId) {
-    query = query.eq("question_type_id", questionTypeId);
-  }
-
-  return query;
-}
-
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
@@ -232,8 +194,33 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function filterMistakesByPath(
+  mistakes: StudentMistakeListItem[],
+  filters: {
+    level1: string;
+    level2: string;
+    level3: string;
+  }
+) {
+  return mistakes.filter((mistake) => {
+    if (filters.level1 && mistake.question_types?.level1 !== filters.level1) {
+      return false;
+    }
+
+    if (filters.level2 && mistake.question_types?.level2 !== filters.level2) {
+      return false;
+    }
+
+    if (filters.level3 && mistake.question_types?.level3 !== filters.level3) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 function getClassificationStatusLabel(
-  status: MistakeRow["classification_status"]
+  status: StudentMistakeListItem["classification_status"]
 ) {
   if (status === "teacher_confirmed") {
     return "教师已确认";

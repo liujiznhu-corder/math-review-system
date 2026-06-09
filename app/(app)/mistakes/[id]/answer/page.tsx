@@ -4,37 +4,11 @@ import { notFound, redirect } from "next/navigation";
 import { LatexContentRenderer } from "@/components/problems/LatexContentRenderer";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import { canManageQuestionTypes, getCurrentUserRole } from "@/lib/roles";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import type { Database } from "@/types/database";
-
-type QuestionTypeRow = Pick<
-  Database["public"]["Tables"]["question_types"]["Row"],
-  "id" | "level1" | "level2" | "level3"
->;
-
-type MistakeAnswerRow = Pick<
-  Database["public"]["Tables"]["mistakes"]["Row"],
-  | "id"
-  | "user_id"
-  | "stem"
-  | "input_type"
-  | "raw_text"
-  | "raw_latex"
-  | "latex_content"
-  | "answer"
-  | "analysis"
-  | "teacher_note"
-  | "created_at"
-  | "classification_status"
-> & {
-  question_types: QuestionTypeRow | QuestionTypeRow[] | null;
-};
-
-type ProblemSolutionRow = Pick<
-  Database["public"]["Tables"]["problems"]["Row"],
-  "id" | "source_mistake_id" | "answer" | "analysis" | "updated_at"
->;
+import {
+  getStudentMistakeAnswerData,
+  type StudentMistakeAnswer
+} from "@/services/student/solutions";
 
 type AnswerPageProps = {
   params: Promise<{
@@ -64,19 +38,24 @@ export default async function MistakeAnswerPage({
 
   const role = await getCurrentUserRole();
   const canManage = canManageQuestionTypes(role);
-  const mistake = canManage
-    ? await getMistakeForTeacher(id)
-    : await getMistakeForStudent(id, user.id);
+  const answerData = await getStudentMistakeAnswerData({
+    mistakeId: id,
+    userId: user.id,
+    canManage
+  });
 
-  if (!mistake) {
+  if (!answerData) {
     notFound();
   }
 
-  const questionType = normalizeQuestionType(mistake.question_types);
-  const solution = await getProblemSolution(mistake.id);
-  const answer = solution?.answer ?? mistake.answer;
-  const analysis = solution?.analysis ?? mistake.analysis;
-  const hasAnswerContent = Boolean(answer?.trim() || analysis?.trim());
+  const {
+    mistake,
+    questionType,
+    solution,
+    answer,
+    analysis,
+    hasAnswerContent
+  } = answerData;
 
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-6 py-8">
@@ -178,52 +157,8 @@ function AnswerBlock({ title, content }: { title: string; content: string }) {
   );
 }
 
-async function getMistakeForStudent(id: string, userId: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("mistakes")
-    .select(
-      "id, user_id, stem, input_type, raw_text, raw_latex, latex_content, answer, analysis, teacher_note, created_at, classification_status, question_types(id, level1, level2, level3)"
-    )
-    .eq("id", id)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  return (data as unknown as MistakeAnswerRow | null) ?? null;
-}
-
-async function getMistakeForTeacher(id: string) {
-  const admin = createAdminClient();
-  const { data } = await admin
-    .from("mistakes")
-    .select(
-      "id, user_id, stem, input_type, raw_text, raw_latex, latex_content, answer, analysis, teacher_note, created_at, classification_status, question_types(id, level1, level2, level3)"
-    )
-    .eq("id", id)
-    .maybeSingle();
-
-  return (data as unknown as MistakeAnswerRow | null) ?? null;
-}
-
-async function getProblemSolution(mistakeId: string) {
-  const admin = createAdminClient();
-  const { data } = await admin
-    .from("problems")
-    .select("id, source_mistake_id, answer, analysis, updated_at")
-    .eq("source_mistake_id", mistakeId)
-    .maybeSingle();
-
-  return (data as ProblemSolutionRow | null) ?? null;
-}
-
-function normalizeQuestionType(
-  value: MistakeAnswerRow["question_types"]
-): QuestionTypeRow | null {
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
-
 function getClassificationStatusLabel(
-  status: MistakeAnswerRow["classification_status"]
+  status: StudentMistakeAnswer["classification_status"]
 ) {
   if (status === "teacher_confirmed") {
     return "教师已确认";

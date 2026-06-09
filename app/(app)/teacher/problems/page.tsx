@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FilePenLine, Plus, Trash2 } from "lucide-react";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
+import { CascadingQuestionTypeFilters } from "@/components/question-types/CascadingQuestionTypeFilters";
 import { createClient } from "@/lib/supabase/server";
 import {
   canManageQuestionTypes,
@@ -41,6 +42,7 @@ type ProblemsPageProps = {
     problemType?: string;
     level1?: string;
     level2?: string;
+    level3?: string;
     questionTypeId?: string;
     source?: string;
     keyword?: string;
@@ -55,6 +57,7 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
     problemType: params?.problemType ?? "",
     level1: params?.level1 ?? "",
     level2: params?.level2 ?? "",
+    level3: params?.level3 ?? "",
     questionTypeId: params?.questionTypeId ?? "",
     source: params?.source ?? "",
     keyword: params?.keyword ?? ""
@@ -125,6 +128,16 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
 
       <section className="mt-8 rounded-md border border-ink/10 bg-white p-5 shadow-sm">
         <form className="grid gap-4 lg:grid-cols-6">
+          <CascadingQuestionTypeFilters
+            questionTypes={questionTypeOptions}
+            selectedLevel1={filters.level1}
+            selectedLevel2={filters.level2}
+            selectedLevel3={filters.level3}
+            selectedQuestionTypeId={filters.questionTypeId}
+            hiddenQuestionTypeIdName="questionTypeId"
+            disableLegacyFields
+            className="contents"
+          />
           <label className="block text-sm font-medium text-ink">
             题目类型
             <select
@@ -278,6 +291,14 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
                     答案解析
                   </Link>
                   <CopyLatexButton rawLatex={problem.raw_latex} />
+                  <CopyLatexButton
+                    rawLatex={problem.answer}
+                    label="复制答案 LaTeX"
+                  />
+                  <CopyLatexButton
+                    rawLatex={problem.analysis}
+                    label="复制解析 LaTeX"
+                  />
                   <details>
                     <summary className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink">
                       查看 raw_latex
@@ -286,6 +307,29 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
                       {problem.raw_latex}
                     </pre>
                   </details>
+                  <details>
+                    <summary className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink">
+                      查看答案/解析源码
+                    </summary>
+                    <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-paper p-3 font-mono text-xs leading-5 text-ink/70">
+                      {[
+                        "answer:",
+                        problem.answer ?? "",
+                        "",
+                        "analysis:",
+                        problem.analysis ?? ""
+                      ].join("\n")}
+                    </pre>
+                  </details>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-3 text-sm leading-6 text-ink/55">
+                  <span>
+                    答案状态：{problem.answer?.trim() ? "已填写" : "待补充"}
+                  </span>
+                  <span>
+                    解析状态：{problem.analysis?.trim() ? "已填写" : "待补充"}
+                  </span>
                 </div>
 
                 {problem.answer ? (
@@ -436,6 +480,7 @@ function filterProblems(
     problemType: string;
     level1: string;
     level2: string;
+    level3: string;
     questionTypeId: string;
     source: string;
     keyword: string;
@@ -461,6 +506,10 @@ function filterProblems(
     }
 
     if (filters.level2 && problem.question_types?.level2 !== filters.level2) {
+      return false;
+    }
+
+    if (filters.level3 && problem.question_types?.level3 !== filters.level3) {
       return false;
     }
 
