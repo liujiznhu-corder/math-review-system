@@ -1254,6 +1254,64 @@ app/(app)/reviews/actions.ts
 倒计时卡片下方继续展示原学习仪表盘内容，包括今日待复习、今日已完成、完成率、连续复习天数、薄弱题型 TOP5、知识点掌握度、最近复习记录和最近 30 天复习结果时间轴。
 
 本次调整未修改 Supabase schema、RLS policy 或任何复习任务表结构。
+
+---
+
+# 当前补充说明：错题答案解析
+
+学生端录入错题时只负责题目内容和备注，不要求填写答案或解析。
+
+学生错题库 `/mistakes` 默认展示题目、所属题型、分类状态和录入时间。每条错题提供“查看答案”按钮，跳转到 `/mistakes/[id]/answer`。
+
+`/mistakes/[id]/answer` 的权限和数据读取：
+
+- `student`：使用普通 Supabase server client 读取自己的 `mistakes` 记录，依赖 RLS 和 `user_id` 条件保护。
+- `teacher` / `admin`：先通过 `profiles.role` 判断角色，再使用 service role server client 读取任意错题，避免被学生侧 RLS 限制。
+- 页面展示题目、答案 `mistakes.answer`、解析 `mistakes.analysis`、教师备注 `mistakes.teacher_note`。
+- 如果答案解析为空，显示“答案解析暂未补充，请等待老师更新。”
+
+教师维护入口：
+
+- `/teacher/solutions`：答案解析中心列表页，统一展示教师录入题目和学生已确认错题沉淀出的题目。
+- `/teacher/solutions/[id]`：答案解析编辑页，维护 `problems.answer` 和 `problems.analysis`，并使用 LaTeX 预览。
+- `/teacher/review-mistakes`：审核 pending 错题时确认题型；确认后服务端自动创建或更新 `source_type = student_submitted` 的 `problems` 记录。
+- `/teacher/problems` 和 `/teacher/problems/new`：只负责题目录入、题型归类、raw_latex 和来源信息，不再维护答案解析。
+
+答案解析中心统计：
+
+- 待补答案。
+- 待补解析。
+- 已完成。
+- 教师录入题目数。
+- 学生提交题目数。
+
+答案解析中心筛选：
+
+- 一级分类。
+- 二级分类。
+- 三级题型。
+- `problem_type`。
+- 答案是否已填写。
+- 解析是否已填写。
+- 来源类型：教师录入 / 学生提交。
+- 提交人姓名、邮箱或用户 ID。
+- 关键词搜索 `raw_latex`、`normalized_text`、`source`。
+
+`problems` 来源追溯字段：
+
+- `created_by`：提交人用户 ID。
+- `source_type`：`teacher_created` / `student_submitted`。
+- `source_mistake_id`：如果来自学生错题，则记录原 `mistakes.id`。
+
+学生答案页 `/mistakes/[id]/answer` 的答案读取优先级：
+
+1. 优先读取 `problems.source_mistake_id = mistakes.id` 的 `answer` / `analysis`。
+2. 如果没有关联 problem，则兼容读取 `mistakes.answer` / `mistakes.analysis`。
+
+LaTeX 渲染：
+
+- 题目继续使用 `components/problems/LatexProblemRenderer.tsx`。
+- 答案和解析使用 `components/problems/LatexContentRenderer.tsx`，内部复用 `LatexPreview`，并对裸 `cases/aligned/matrix` 等 display environment 做安全包裹后交给 KaTeX 渲染。
   - 教师备注
   - 复习摘要
 - Supabase schema 和 migrations。

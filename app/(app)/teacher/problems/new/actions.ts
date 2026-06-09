@@ -13,8 +13,6 @@ export async function saveProblem(formData: FormData) {
   const rawLatex = String(formData.get("rawLatex") ?? "");
   const questionTypeId = normalizeOptionalString(formData.get("questionTypeId"));
   const source = normalizeOptionalString(formData.get("source"));
-  const answer = normalizeOptionalString(formData.get("answer"));
-  const analysis = normalizeOptionalString(formData.get("analysis"));
 
   if (!(await canCurrentUserManageProblems())) {
     redirect(withMessage("/mistakes/new", "当前账号不能录入教师题目"));
@@ -26,7 +24,11 @@ export async function saveProblem(formData: FormData) {
 
   const normalized = normalizeLatexProblem(rawLatex);
   const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
   const { error } = await supabase.from("problems").insert({
+    created_by: user?.id,
     problem_type: problemType,
     raw_latex: rawLatex,
     normalized_text: normalized.plainText,
@@ -35,9 +37,8 @@ export async function saveProblem(formData: FormData) {
         ? normalized.options
         : null,
     source,
-    answer,
-    analysis,
-    question_type_id: questionTypeId
+    question_type_id: questionTypeId,
+    source_type: "teacher_created"
   });
 
   if (error) {

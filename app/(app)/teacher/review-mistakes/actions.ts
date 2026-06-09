@@ -14,6 +14,8 @@ export async function confirmMistakeQuestionType(formData: FormData) {
   const mistakeId = String(formData.get("mistakeId") ?? "").trim();
   const questionTypeId = String(formData.get("questionTypeId") ?? "").trim();
   const teacherNote = normalizeOptionalString(formData.get("teacherNote"));
+  const answer = normalizeOptionalString(formData.get("answer"));
+  const analysis = normalizeOptionalString(formData.get("analysis"));
   const problemType = normalizeProblemType(formData.get("problemType"));
   const rawLatex = String(formData.get("rawLatex") ?? "");
   const normalizedProblem = rawLatex.trim()
@@ -62,6 +64,8 @@ export async function confirmMistakeQuestionType(formData: FormData) {
       classification_status: "teacher_confirmed",
       classified_by: "teacher",
       teacher_note: teacherNote,
+      answer,
+      analysis,
       problem_type: problemType,
       raw_latex: rawLatex.trim() ? rawLatex : null,
       normalized_stem: normalizedProblem?.plainText ?? null,
@@ -72,13 +76,26 @@ export async function confirmMistakeQuestionType(formData: FormData) {
     })
     .eq("id", mistakeId)
     .eq("classification_status", "pending")
-    .select("id")
+    .select(
+      "id, user_id, question_type_id, problem_type, raw_latex, latex_content, stem, normalized_stem, normalized_text, options_json, answer, analysis, source, created_at, updated_at"
+    )
     .single();
 
   if (updateError) {
     redirect(
       `/teacher/review-mistakes?message=${encodeURIComponent(
         `update mistakes failed: ${formatSupabaseError(updateError)}`
+      )}`
+    );
+  }
+
+  const solutionResult = await upsertStudentSubmittedProblem(updatedMistake);
+
+  if (!solutionResult.ok) {
+    revalidatePath("/teacher/review-mistakes");
+    redirect(
+      `/teacher/review-mistakes?message=${encodeURIComponent(
+        `update mistakes succeeded, create solution problem failed: ${solutionResult.message}`
       )}`
     );
   }
@@ -96,6 +113,7 @@ export async function confirmMistakeQuestionType(formData: FormData) {
   }
 
   revalidatePath("/teacher/review-mistakes");
+  revalidatePath("/teacher/solutions");
   revalidatePath("/reviews");
   redirect(
     withMessage(
@@ -103,6 +121,61 @@ export async function confirmMistakeQuestionType(formData: FormData) {
       "update mistakes succeeded, insert review_tasks succeeded"
     )
   );
+}
+
+async function upsertStudentSubmittedProblem(mistake: {
+  id: string;
+  user_id: string;
+  question_type_id: string | null;
+  problem_type: ProblemType;
+  raw_latex: string | null;
+  latex_content: string | null;
+  stem: string;
+  normalized_stem: string | null;
+  normalized_text?: string | null;
+  options_json: unknown;
+  answer: string | null;
+  analysis: string | null;
+  source: string | null;
+  created_at: string;
+  updated_at: string;
+}) {
+  const admin = createAdminClient();
+  const rawLatex = mistake.raw_latex || mistake.latex_content || mistake.stem;
+  const normalizedText =
+    mistake.normalized_stem ?? mistake.normalized_text ?? mistake.stem;
+  const { error } = await admin.from("problems").upsert(
+    {
+      created_by: mistake.user_id,
+      question_type_id: mistake.question_type_id,
+      problem_type: mistake.problem_type,
+      raw_latex: rawLatex,
+      normalized_text: normalizedText,
+      options_json: mistake.options_json,
+      answer: mistake.answer,
+      analysis: mistake.analysis,
+      source: mistake.source,
+      source_type: "student_submitted",
+      source_mistake_id: mistake.id,
+      created_at: mistake.created_at,
+      updated_at: mistake.updated_at
+    },
+    {
+      onConflict: "source_mistake_id"
+    }
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      message: formatSupabaseError(error)
+    };
+  }
+
+  return {
+    ok: true,
+    message: "solution problem upserted"
+  };
 }
 
 function normalizeOptionalString(value: FormDataEntryValue | null) {

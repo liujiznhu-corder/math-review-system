@@ -254,3 +254,28 @@ supabase/migrations/202606090010_fix_problems_table_and_dashboard.sql
 - 录入错题：`/mistakes/new`
 - 错题库：`/mistakes`
 - 今日复习：`/reviews`
+
+## 错题答案解析
+
+学生录入错题时只需要填写题目内容和备注，不需要填写答案或解析。
+
+答案解析由教师端“答案解析中心”统一维护：
+
+- `/teacher/solutions`：答案解析列表、筛选、统计和来源追溯。
+- `/teacher/solutions/[id]`：编辑某一道题的 `answer` 和 `analysis`，左侧输入、右侧实时预览。
+- `/teacher/review-mistakes`：审核学生错题后，系统会把已确认题型的错题沉淀为 `student_submitted` 来源的 problem，进入答案解析中心。
+- `/teacher/problems` 和 `/teacher/problems/new` 只负责题目录入与题型归类，不再维护答案解析。
+
+学生错题库 `/mistakes` 默认只展示题目、所属题型、分类状态和录入时间。点击“查看答案”进入 `/mistakes/[id]/answer`：
+
+- 如果老师已补充答案解析，则渲染展示答案和解析。
+- 如果老师尚未补充，则显示“答案解析暂未补充，请等待老师更新。”
+- 学生答案页优先读取关联 `problems.answer` / `problems.analysis`；没有关联 problem 时兼容读取 `mistakes.answer` / `mistakes.analysis`。
+
+今日复习 `/reviews` 中每道题也提供“查看答案”入口，跳转到同一个答案页。
+
+答案解析中心的来源追溯字段：
+
+- `problems.source_type`：`teacher_created` / `student_submitted`
+- `problems.source_mistake_id`：学生错题沉淀为 problem 时记录原错题 ID
+- `problems.created_by`：教师录入时为教师用户 ID，学生提交时为学生用户 ID

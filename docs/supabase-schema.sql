@@ -55,11 +55,17 @@ create table if not exists public.problems (
   answer text,
   analysis text,
   source text,
+  source_type text not null default 'teacher_created',
+  source_mistake_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint problems_problem_type_check check (
     problem_type in ('single_choice', 'fill_blank', 'calculation')
-  )
+  ),
+  constraint problems_source_type_check check (
+    source_type in ('teacher_created', 'student_submitted')
+  ),
+  constraint problems_source_mistake_unique unique (source_mistake_id)
 );
 
 create table if not exists public.mistakes (
@@ -91,6 +97,13 @@ create table if not exists public.mistakes (
   constraint mistakes_classified_by_check check (classified_by is null or classified_by in ('student', 'teacher', 'system')),
   constraint mistakes_status_check check (status in ('reviewing', 'mastered', 'archived'))
 );
+
+alter table public.problems
+drop constraint if exists problems_source_mistake_id_fkey;
+
+alter table public.problems
+add constraint problems_source_mistake_id_fkey
+foreign key (source_mistake_id) references public.mistakes(id) on delete set null;
 
 create table if not exists public.review_tasks (
   id uuid primary key default gen_random_uuid(),
@@ -151,6 +164,8 @@ create index if not exists question_types_keywords_idx on public.question_types 
 create index if not exists question_type_examples_type_idx on public.question_type_examples (question_type_id);
 create index if not exists problems_question_type_idx on public.problems (question_type_id);
 create index if not exists problems_created_by_idx on public.problems (created_by, created_at desc);
+create index if not exists problems_source_type_idx on public.problems (source_type, updated_at desc);
+create unique index if not exists problems_source_mistake_unique_idx on public.problems (source_mistake_id) where source_mistake_id is not null;
 create index if not exists mistakes_user_created_idx on public.mistakes (user_id, created_at desc);
 create index if not exists mistakes_type_idx on public.mistakes (question_type_id);
 create index if not exists mistakes_problem_type_idx on public.mistakes (problem_type);

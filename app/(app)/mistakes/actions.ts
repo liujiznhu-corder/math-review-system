@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   classifyQuestion,
@@ -185,6 +186,20 @@ export async function saveMistake(formData: FormData) {
   }
 
   if (!submitForReview) {
+    await createStudentSubmittedProblem({
+      mistakeId: mistake.id,
+      userId: user.id,
+      questionTypeId,
+      problemType: "calculation",
+      rawLatex: inputType === "latex" ? latexContent : stem,
+      normalizedText:
+        inputType === "latex" ? (normalizedProblem?.plainText ?? stem) : stem,
+      optionsJson:
+        inputType === "latex" && normalizedProblem?.options
+          ? normalizedProblem.options
+          : null,
+      source: null
+    });
     await createReviewTasksForMistake(mistake.id);
   }
 
@@ -195,6 +210,45 @@ export async function saveMistake(formData: FormData) {
       "/mistakes",
       submitForReview ? "错题已提交教师审核" : "错题已保存"
     )
+  );
+}
+
+async function createStudentSubmittedProblem({
+  mistakeId,
+  userId,
+  questionTypeId,
+  problemType,
+  rawLatex,
+  normalizedText,
+  optionsJson,
+  source
+}: {
+  mistakeId: string;
+  userId: string;
+  questionTypeId: string;
+  problemType: "calculation";
+  rawLatex: string;
+  normalizedText: string;
+  optionsJson: unknown;
+  source: string | null;
+}) {
+  const admin = createAdminClient();
+
+  await admin.from("problems").upsert(
+    {
+      created_by: userId,
+      question_type_id: questionTypeId,
+      problem_type: problemType,
+      raw_latex: rawLatex,
+      normalized_text: normalizedText,
+      options_json: optionsJson,
+      source,
+      source_type: "student_submitted",
+      source_mistake_id: mistakeId
+    },
+    {
+      onConflict: "source_mistake_id"
+    }
   );
 }
 

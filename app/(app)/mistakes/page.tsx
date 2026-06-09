@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Filter, Plus } from "lucide-react";
+import { Eye, Filter, Plus } from "lucide-react";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import { createClient } from "@/lib/supabase/server";
 import { redirectTeacherToDashboard } from "@/lib/roles";
@@ -14,8 +14,6 @@ type MistakeRow = Pick<
   Database["public"]["Tables"]["mistakes"]["Row"],
   | "id"
   | "stem"
-  | "note"
-  | "status"
   | "created_at"
   | "question_type_id"
   | "input_type"
@@ -23,7 +21,6 @@ type MistakeRow = Pick<
   | "raw_latex"
   | "latex_content"
   | "classification_status"
-  | "teacher_note"
 > & {
   question_types: QuestionTypeRow | null;
 };
@@ -37,19 +34,6 @@ type MistakesPageProps = {
     questionTypeId?: string;
     message?: string;
   }>;
-};
-
-type ReviewTaskSummaryRow = {
-  mistake_id: string;
-  status: "pending" | "completed" | "skipped";
-  result: "mastered" | "not_mastered" | null;
-  completed_at: string | null;
-};
-
-type ReviewSummary = {
-  pendingCount: number;
-  completedCount: number;
-  latestResult: "mastered" | "not_mastered" | null;
 };
 
 export const dynamic = "force-dynamic";
@@ -75,9 +59,6 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
   const mistakes = normalizeMistakes(
     (mistakesResult.data ?? []) as unknown as MistakeRawRow[]
   );
-  const reviewSummaries = await getReviewSummaries(
-    mistakes.map((mistake) => mistake.id)
-  );
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-6 py-8">
@@ -86,7 +67,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
           <p className="text-sm font-medium text-clay">个人错题库</p>
           <h1 className="mt-1 text-2xl font-semibold text-ink">错题库</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
-            查看已保存错题，可按最终确认的题型筛选。
+            默认只展示题目、所属题型、分类状态和录入时间；答案解析单独进入详情页查看。
           </p>
         </div>
         <Link
@@ -159,74 +140,58 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
             暂无错题。先录入一道题并确认题型。
           </div>
         ) : (
-          <div className="mt-4 overflow-hidden rounded-md border border-ink/10 bg-white">
-            {mistakes.map((mistake) => {
-              const summary = reviewSummaries.get(mistake.id) ?? {
-                pendingCount: 0,
-                completedCount: 0,
-                latestResult: null
-              };
-
-              return (
-                <article
-                  key={mistake.id}
-                  className="border-b border-ink/10 p-5 last:border-b-0"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-sm text-ink/55">
-                        {mistake.question_types
-                          ? `${mistake.question_types.level1} / ${mistake.question_types.level2}`
-                          : "未分类"}
-                      </p>
-                      <h3 className="mt-1 text-base font-semibold text-ink">
-                        {mistake.question_types?.level3 ?? "未确认题型"}
-                      </h3>
-                    </div>
+          <div className="mt-4 space-y-4">
+            {mistakes.map((mistake) => (
+              <article
+                key={mistake.id}
+                className="rounded-md border border-ink/10 bg-white p-5 shadow-sm"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
                     <p className="text-sm text-ink/55">
-                      {formatDate(mistake.created_at)}
+                      {mistake.question_types
+                        ? `${mistake.question_types.level1} / ${mistake.question_types.level2}`
+                        : "未分类"}
                     </p>
+                    <h3 className="mt-1 text-base font-semibold text-ink">
+                      {mistake.question_types?.level3 ?? "未确认题型"}
+                    </h3>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <span className="rounded-md bg-paper px-2 py-1 text-xs text-ink/65">
                       {getClassificationStatusLabel(
                         mistake.classification_status
                       )}
                     </span>
                     <span className="rounded-md bg-paper px-2 py-1 text-xs text-ink/65">
-                      待复习 {summary.pendingCount}
-                    </span>
-                    <span className="rounded-md bg-paper px-2 py-1 text-xs text-ink/65">
-                      已完成 {summary.completedCount}
-                    </span>
-                    <span className="rounded-md bg-paper px-2 py-1 text-xs text-ink/65">
-                      最近结果：{getReviewResultLabel(summary.latestResult)}
+                      {formatDate(mistake.created_at)}
                     </span>
                   </div>
-                  <div className="mt-4">
-                    {mistake.input_type === "latex" ? (
-                      <LatexProblemRenderer
-                        rawLatex={mistake.raw_latex ?? mistake.latex_content}
-                      />
-                    ) : (
-                      <p className="whitespace-pre-wrap text-sm leading-6 text-ink/75">
-                        {mistake.raw_text || mistake.stem}
-                      </p>
-                    )}
-                  </div>
-                  {mistake.note ? (
-                    <p className="mt-3 rounded-md bg-paper px-3 py-2 text-sm leading-6 text-ink/65">
-                      备注：{mistake.note}
+                </div>
+
+                <div className="mt-4 rounded-md bg-paper p-4">
+                  {mistake.input_type === "latex" ? (
+                    <LatexProblemRenderer
+                      rawLatex={mistake.raw_latex ?? mistake.latex_content}
+                    />
+                  ) : (
+                    <p className="whitespace-pre-wrap text-sm leading-6 text-ink/75">
+                      {mistake.raw_text || mistake.stem}
                     </p>
-                  ) : null}
-                  {mistake.teacher_note ? (
-                    <p className="mt-3 rounded-md border border-moss/20 bg-moss/5 px-3 py-2 text-sm leading-6 text-moss">
-                      教师备注：{mistake.teacher_note}
-                    </p>
-                  ) : null}
-                </article>
-              );
-            })}
+                  )}
+                </div>
+
+                <div className="mt-4">
+                  <Link
+                    href={`/mistakes/${mistake.id}/answer`}
+                    className="inline-flex h-9 items-center gap-2 rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink hover:border-moss/40 hover:text-moss"
+                  >
+                    <Eye className="h-4 w-4" />
+                    查看答案
+                  </Link>
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </section>
@@ -248,7 +213,7 @@ async function getMistakes(questionTypeId: string) {
   let query = supabase
     .from("mistakes")
     .select(
-        "id, stem, note, status, created_at, question_type_id, input_type, raw_text, raw_latex, latex_content, classification_status, teacher_note, question_types(id, level1, level2, level3)"
+      "id, stem, created_at, question_type_id, input_type, raw_text, raw_latex, latex_content, classification_status, question_types(id, level1, level2, level3)"
     )
     .order("created_at", { ascending: false });
 
@@ -257,45 +222,6 @@ async function getMistakes(questionTypeId: string) {
   }
 
   return query;
-}
-
-async function getReviewSummaries(mistakeIds: string[]) {
-  const summaries = new Map<string, ReviewSummary>();
-
-  if (mistakeIds.length === 0) {
-    return summaries;
-  }
-
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("review_tasks")
-    .select("mistake_id, status, result, completed_at")
-    .in("mistake_id", mistakeIds)
-    .order("completed_at", { ascending: false, nullsFirst: false });
-
-  for (const task of (data ?? []) as ReviewTaskSummaryRow[]) {
-    const summary = summaries.get(task.mistake_id) ?? {
-      pendingCount: 0,
-      completedCount: 0,
-      latestResult: null
-    };
-
-    if (task.status === "pending") {
-      summary.pendingCount += 1;
-    }
-
-    if (task.status === "completed") {
-      summary.completedCount += 1;
-
-      if (!summary.latestResult && task.result) {
-        summary.latestResult = task.result;
-      }
-    }
-
-    summaries.set(task.mistake_id, summary);
-  }
-
-  return summaries;
 }
 
 function formatDate(value: string) {
@@ -318,16 +244,4 @@ function getClassificationStatusLabel(
   }
 
   return "待教师审核";
-}
-
-function getReviewResultLabel(result: ReviewSummary["latestResult"]) {
-  if (result === "mastered") {
-    return "已掌握";
-  }
-
-  if (result === "not_mastered") {
-    return "未掌握";
-  }
-
-  return "暂无";
 }

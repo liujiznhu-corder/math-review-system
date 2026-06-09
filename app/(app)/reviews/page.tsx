@@ -1,4 +1,5 @@
-import { CheckCircle2, XCircle } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, Eye, XCircle } from "lucide-react";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import { createClient } from "@/lib/supabase/server";
 import { redirectTeacherToDashboard } from "@/lib/roles";
@@ -105,7 +106,19 @@ export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
                     </p>
                   ) : null}
 
+                  <p className="mt-5 text-sm text-ink/55">
+                    建议先查看答案解析，再选择本次复习结果。
+                  </p>
                   <div className="mt-5 flex flex-wrap gap-3">
+                    {mistake ? (
+                      <Link
+                        href={`/mistakes/${mistake.id}/answer`}
+                        className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink"
+                      >
+                        <Eye className="h-4 w-4" />
+                        查看答案
+                      </Link>
+                    ) : null}
                     <form action={completeReviewTask}>
                       <input type="hidden" name="taskId" value={task.id} />
                       <button

@@ -270,6 +270,13 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-3">
+                  <Link
+                    href={`/teacher/solutions/${problem.id}`}
+                    className="inline-flex h-9 items-center gap-2 rounded-md bg-moss px-3 text-sm font-medium text-white"
+                  >
+                    <FilePenLine className="h-4 w-4" />
+                    答案解析
+                  </Link>
                   <CopyLatexButton rawLatex={problem.raw_latex} />
                   <details>
                     <summary className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink">
@@ -282,13 +289,13 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
                 </div>
 
                 {problem.answer ? (
-                  <p className="mt-3 text-sm leading-6 text-ink/65">
-                    答案：{problem.answer}
+                  <p className="mt-3 text-sm leading-6 text-ink/55">
+                    答案状态：已填写
                   </p>
                 ) : null}
                 {problem.analysis ? (
-                  <p className="mt-3 text-sm leading-6 text-ink/65">
-                    解析：{problem.analysis}
+                  <p className="mt-1 text-sm leading-6 text-ink/55">
+                    解析状态：已填写
                   </p>
                 ) : null}
                 {problem.source ? (
@@ -377,11 +384,7 @@ function ProblemEditForm({
           className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 font-mono text-sm leading-6 outline-none focus:border-moss"
         />
       </label>
-      <div className="grid gap-4 md:grid-cols-2">
-        <TextArea name="source" label="来源" rows={2} value={problem.source} />
-        <TextArea name="answer" label="答案" rows={2} value={problem.answer} />
-      </div>
-      <TextArea name="analysis" label="解析" rows={4} value={problem.analysis} />
+      <TextArea name="source" label="来源" rows={2} value={problem.source} />
       <div>
         <button
           type="submit"

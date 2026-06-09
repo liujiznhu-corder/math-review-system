@@ -14,8 +14,6 @@ export async function updateProblem(formData: FormData) {
   const rawLatex = String(formData.get("rawLatex") ?? "");
   const questionTypeId = normalizeOptionalString(formData.get("questionTypeId"));
   const source = normalizeOptionalString(formData.get("source"));
-  const answer = normalizeOptionalString(formData.get("answer"));
-  const analysis = normalizeOptionalString(formData.get("analysis"));
 
   await requireProblemManager();
 
@@ -40,8 +38,6 @@ export async function updateProblem(formData: FormData) {
           ? normalized.options
           : null,
       source,
-      answer,
-      analysis,
       question_type_id: questionTypeId
     })
     .eq("id", id);

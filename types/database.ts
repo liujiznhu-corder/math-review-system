@@ -131,6 +131,8 @@ export type Database = {
           answer: string | null;
           analysis: string | null;
           source: string | null;
+          source_type: "teacher_created" | "student_submitted";
+          source_mistake_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -145,6 +147,8 @@ export type Database = {
           answer?: string | null;
           analysis?: string | null;
           source?: string | null;
+          source_type?: "teacher_created" | "student_submitted";
+          source_mistake_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -159,6 +163,8 @@ export type Database = {
           answer?: string | null;
           analysis?: string | null;
           source?: string | null;
+          source_type?: "teacher_created" | "student_submitted";
+          source_mistake_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -167,6 +173,12 @@ export type Database = {
             foreignKeyName: "problems_question_type_id_fkey";
             columns: ["question_type_id"];
             referencedRelation: "question_types";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "problems_source_mistake_id_fkey";
+            columns: ["source_mistake_id"];
+            referencedRelation: "mistakes";
             referencedColumns: ["id"];
           }
         ];

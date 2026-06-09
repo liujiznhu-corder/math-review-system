@@ -260,6 +260,24 @@ export default async function ReviewMistakesPage({
                         className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 text-sm leading-6 outline-none focus:border-moss"
                       />
                     </label>
+                    <label className="block text-sm font-medium text-ink">
+                      答案（可选，支持 LaTeX）
+                      <textarea
+                        name="answer"
+                        rows={3}
+                        placeholder="可选：例如 $\\frac{1}{2}$"
+                        className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 font-mono text-sm leading-6 outline-none focus:border-moss"
+                      />
+                    </label>
+                    <label className="block text-sm font-medium text-ink">
+                      解析（可选，支持 LaTeX）
+                      <textarea
+                        name="analysis"
+                        rows={5}
+                        placeholder="可选：填写解题步骤、关键公式或易错点。"
+                        className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 font-mono text-sm leading-6 outline-none focus:border-moss"
+                      />
+                    </label>
                     <div>
                       <button
                         type="submit"

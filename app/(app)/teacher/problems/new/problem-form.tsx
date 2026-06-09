@@ -87,12 +87,7 @@ export function ProblemForm({ message, questionTypes }: ProblemFormProps) {
           />
         </label>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <TextArea name="source" label="来源" rows={2} />
-          <TextArea name="answer" label="答案" rows={2} />
-        </div>
-
-        <TextArea name="analysis" label="解析" rows={5} className="mt-4" />
+        <TextArea name="source" label="来源" rows={2} className="mt-4" />
 
         <div className="mt-5">
           <button

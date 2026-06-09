@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   FilePlus2,
+  FileText,
   LayoutDashboard,
   LibraryBig,
   LogOut,
@@ -59,6 +60,11 @@ const teacherNavigationItems = [
     href: "/teacher/problems",
     label: "教师题库",
     icon: LibraryBig
+  },
+  {
+    href: "/teacher/solutions",
+    label: "答案解析",
+    icon: FileText
   },
   {
     href: "/teacher/problems/new",
