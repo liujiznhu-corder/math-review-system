@@ -199,9 +199,7 @@ export async function createPracticeSession({
 
   const supabase = await createClient();
   const selectedQuestionType = await getQuestionTypeOrThrow(questionTypeId);
-  const candidates = await getCandidateProblems();
-  const selectedProblems = selectPracticeProblems({
-    candidates,
+  const selectedProblems = await selectPracticeProblems({
     selectedQuestionType,
     targetCount: PRACTICE_QUESTION_COUNT
   });
@@ -592,14 +590,35 @@ async function getQuestionTypeOrThrow(questionTypeId: string) {
   return data as QuestionTypeRow;
 }
 
-async function getCandidateProblems(): Promise<CandidateProblem[]> {
+async function getCandidateProblems({
+  questionTypeIds,
+  excludeProblemIds,
+  limit
+}: {
+  questionTypeIds: string[] | null;
+  excludeProblemIds: Set<string>;
+  limit: number;
+}): Promise<CandidateProblem[]> {
+  if (questionTypeIds && questionTypeIds.length === 0) {
+    return [];
+  }
+
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const oversampleLimit = Math.max(limit * 5, 10);
+  let query = supabase
     .from("problems")
     .select(
       "id, question_type_id, problem_type, raw_latex, answer, analysis, question_types(id, level1, level2, level3)"
     )
-    .not("question_type_id", "is", null);
+    .not("question_type_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(oversampleLimit);
+
+  if (questionTypeIds) {
+    query = query.in("question_type_id", questionTypeIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new StudentPracticeError(
@@ -630,60 +649,66 @@ async function getCandidateProblems(): Promise<CandidateProblem[]> {
     });
   }
 
-  return candidates;
+  return shuffle(
+    candidates.filter((problem) => !excludeProblemIds.has(problem.id))
+  )
+    .sort((left, right) => Number(right.hasSolution) - Number(left.hasSolution))
+    .slice(0, limit);
 }
 
-function selectPracticeProblems({
-  candidates,
+async function selectPracticeProblems({
   selectedQuestionType,
   targetCount
 }: {
-  candidates: CandidateProblem[];
   selectedQuestionType: QuestionTypeRow;
   targetCount: number;
 }) {
   const selected: CandidateProblem[] = [];
   const usedProblemIds = new Set<string>();
+  const relatedQuestionTypes = await getRelatedQuestionTypes(selectedQuestionType);
+  const sameSecondaryTypeIds = relatedQuestionTypes
+    .filter(
+      (questionType) =>
+        questionType.id !== selectedQuestionType.id &&
+        questionType.level2 === selectedQuestionType.level2
+    )
+    .map((questionType) => questionType.id);
+  const sameLevelTypeIds = relatedQuestionTypes
+    .filter(
+      (questionType) =>
+        questionType.id !== selectedQuestionType.id &&
+        questionType.level2 !== selectedQuestionType.level2
+    )
+    .map((questionType) => questionType.id);
 
-  pickIntoSelection(
-    candidates.filter(
-      (problem) => problem.questionTypeId === selectedQuestionType.id
-    ),
+  await pickIntoSelection(
+    [selectedQuestionType.id],
     selected,
     usedProblemIds,
     targetCount
   );
 
-  pickIntoSelection(
-    candidates.filter(
-      (problem) =>
-        problem.questionTypeId !== selectedQuestionType.id &&
-        problem.questionType?.level1 === selectedQuestionType.level1 &&
-        problem.questionType?.level2 === selectedQuestionType.level2
-    ),
+  await pickIntoSelection(
+    sameSecondaryTypeIds,
     selected,
     usedProblemIds,
     targetCount
   );
 
-  pickIntoSelection(
-    candidates.filter(
-      (problem) =>
-        problem.questionType?.level1 === selectedQuestionType.level1 &&
-        problem.questionType?.level2 !== selectedQuestionType.level2
-    ),
+  await pickIntoSelection(
+    sameLevelTypeIds,
     selected,
     usedProblemIds,
     targetCount
   );
 
-  pickIntoSelection(candidates, selected, usedProblemIds, targetCount);
+  await pickIntoSelection(null, selected, usedProblemIds, targetCount);
 
   return selected.slice(0, targetCount);
 }
 
-function pickIntoSelection(
-  pool: CandidateProblem[],
+async function pickIntoSelection(
+  questionTypeIds: string[] | null,
   selected: CandidateProblem[],
   usedProblemIds: Set<string>,
   targetCount: number
@@ -692,11 +717,13 @@ function pickIntoSelection(
     return;
   }
 
-  const sorted = shuffle(
-    pool.filter((problem) => !usedProblemIds.has(problem.id))
-  ).sort((left, right) => Number(right.hasSolution) - Number(left.hasSolution));
+  const candidates = await getCandidateProblems({
+    questionTypeIds,
+    excludeProblemIds: usedProblemIds,
+    limit: targetCount - selected.length
+  });
 
-  for (const problem of sorted) {
+  for (const problem of candidates) {
     if (selected.length >= targetCount) {
       break;
     }
@@ -704,6 +731,25 @@ function pickIntoSelection(
     selected.push(problem);
     usedProblemIds.add(problem.id);
   }
+}
+
+async function getRelatedQuestionTypes(selectedQuestionType: QuestionTypeRow) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("question_types")
+    .select("id, level1, level2, level3")
+    .eq("is_active", true)
+    .eq("level1", selectedQuestionType.level1);
+
+  if (error) {
+    throw new StudentPracticeError(
+      "SERVER_ERROR",
+      `读取相近题型失败：${error.message}`,
+      500
+    );
+  }
+
+  return (data ?? []) as QuestionTypeRow[];
 }
 
 async function markRecordAddedToMistakes(

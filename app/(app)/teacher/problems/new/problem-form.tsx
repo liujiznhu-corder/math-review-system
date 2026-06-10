@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Save } from "lucide-react";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
+import { SubmitButton } from "@/components/submit-button";
 import { saveProblem } from "./actions";
 
 type ProblemType = "single_choice" | "fill_blank" | "calculation";
@@ -90,13 +91,13 @@ export function ProblemForm({ message, questionTypes }: ProblemFormProps) {
         <TextArea name="source" label="来源" rows={2} className="mt-4" />
 
         <div className="mt-5">
-          <button
-            type="submit"
+          <SubmitButton
+            pendingText="保存中..."
             className="inline-flex h-10 items-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white"
           >
             <Save className="h-4 w-4" />
             保存题目
-          </button>
+          </SubmitButton>
         </div>
       </form>
 

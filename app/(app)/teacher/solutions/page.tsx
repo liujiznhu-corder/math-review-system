@@ -3,6 +3,7 @@ import { FilePenLine, LibraryBig, Search } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import { CascadingQuestionTypeFilters } from "@/components/question-types/CascadingQuestionTypeFilters";
+import { SubmitButton } from "@/components/submit-button";
 import {
   canManageQuestionTypes,
   getCurrentUserRole,
@@ -340,13 +341,13 @@ export default async function SolutionsPage({
                       {row.solutionType === "mistake" ? (
                         <form action={addMistakeToProblemLibrary}>
                           <input type="hidden" name="mistakeId" value={row.id} />
-                          <button
-                            type="submit"
+                          <SubmitButton
+                            pendingText="加入中..."
                             className="inline-flex h-9 items-center gap-2 rounded-md border border-moss/20 bg-moss/10 px-3 text-sm font-medium text-moss"
                           >
                             <LibraryBig className="h-4 w-4" />
                             加入教师题库
-                          </button>
+                          </SubmitButton>
                         </form>
                       ) : null}
                       <CopyLatexButton

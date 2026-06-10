@@ -1,6 +1,7 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
+import { SubmitButton } from "@/components/submit-button";
 
 type DeleteQuestionTypeButtonProps = {
   id: string;
@@ -21,13 +22,13 @@ export function DeleteQuestionTypeButton({
       }}
     >
       <input type="hidden" name="id" value={id} />
-      <button
-        type="submit"
+      <SubmitButton
+        pendingText="..."
         title="删除题型"
         className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-clay/20 text-clay hover:bg-clay/10"
       >
         <Trash2 className="h-4 w-4" />
-      </button>
+      </SubmitButton>
     </form>
   );
 }

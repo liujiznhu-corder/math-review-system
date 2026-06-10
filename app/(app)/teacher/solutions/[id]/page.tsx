@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, LibraryBig } from "lucide-react";
 import { notFound } from "next/navigation";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
+import { SubmitButton } from "@/components/submit-button";
 import {
   canManageQuestionTypes,
   getCurrentUserRole,
@@ -132,13 +133,13 @@ export default async function SolutionPage({
         {record.solutionType === "mistake" ? (
           <form action={addMistakeToProblemLibrary}>
             <input type="hidden" name="mistakeId" value={record.id} />
-            <button
-              type="submit"
+            <SubmitButton
+              pendingText="加入中..."
               className="inline-flex h-10 items-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white"
             >
               <LibraryBig className="h-4 w-4" />
               加入教师题库
-            </button>
+            </SubmitButton>
           </form>
         ) : record.sourceMistakeId ? (
           <span className="inline-flex h-10 items-center rounded-md border border-moss/20 bg-moss/10 px-4 text-sm font-medium text-moss">

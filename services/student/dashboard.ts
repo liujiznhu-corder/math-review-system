@@ -6,10 +6,21 @@ type QuestionTypeInfo = Pick<
   "id" | "level1" | "level2" | "level3"
 >;
 
-type CompletedReviewRawRow = {
+type MasteryReviewRawRow = {
   id: string;
-  question_type_id: string | null;
-  review_date: string;
+  result: "mastered" | "not_mastered" | null;
+  mistakes:
+    | {
+        question_types: QuestionTypeInfo | QuestionTypeInfo[] | null;
+      }
+    | Array<{
+        question_types: QuestionTypeInfo | QuestionTypeInfo[] | null;
+      }>
+    | null;
+};
+
+type RecentReviewRawRow = {
+  id: string;
   review_round: string;
   result: "mastered" | "not_mastered" | null;
   completed_at: string | null;
@@ -94,11 +105,12 @@ export async function getStudentDashboardData(
     weakPracticeToday,
     weakPracticeCompletedToday,
     completedDateRows,
-    completedReviewRows,
-    recentMistakeRows,
-    recentCompletedReviewRows,
-    recentPracticeRecordRows,
-    recentWeakPracticeRows
+    masteryReviewRows,
+    recentReviewRows,
+    recentMistakeCount,
+    recentCompletedReviewCount,
+    recentPracticeRecordCount,
+    recentWeakPracticeCount
   ] = await Promise.all([
     supabase
       .from("review_tasks")
@@ -135,7 +147,7 @@ export async function getStudentDashboardData(
     supabase
       .from("review_tasks")
       .select(
-        "id, question_type_id, review_date, review_round, result, completed_at, mistakes(id, stem, raw_text, question_types(id, level1, level2, level3))"
+        "id, result, mistakes(question_types(id, level1, level2, level3))"
       )
       .eq("user_id", userId)
       .eq("status", "completed")
@@ -143,38 +155,49 @@ export async function getStudentDashboardData(
       .order("completed_at", { ascending: false })
       .limit(300),
     supabase
+      .from("review_tasks")
+      .select(
+        "id, review_round, result, completed_at, mistakes(id, stem, raw_text, question_types(id, level1, level2, level3))"
+      )
+      .eq("user_id", userId)
+      .eq("status", "completed")
+      .not("completed_at", "is", null)
+      .order("completed_at", { ascending: false })
+      .limit(5),
+    supabase
       .from("mistakes")
-      .select("id, created_at")
+      .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("created_at", sevenDaysAgoStartIso)
       .lt("created_at", tomorrowStartIso),
     supabase
       .from("review_tasks")
-      .select("id, completed_at")
+      .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("status", "completed")
       .gte("completed_at", sevenDaysAgoStartIso)
       .lt("completed_at", tomorrowStartIso),
     supabase
       .from("practice_records")
-      .select("id, answered_at")
+      .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("status", "completed")
       .gte("answered_at", sevenDaysAgoStartIso)
       .lt("answered_at", tomorrowStartIso),
     supabase
       .from("weak_practice_tasks")
-      .select("id, completed_at")
+      .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("status", "completed")
       .gte("completed_at", sevenDaysAgoStartIso)
       .lt("completed_at", tomorrowStartIso)
   ]);
 
-  const completedRows =
-    ((completedReviewRows.data ?? []) as unknown as CompletedReviewRawRow[]) ??
-    [];
-  const masterySummaries = buildMasterySummaries(completedRows);
+  const masteryRows =
+    ((masteryReviewRows.data ?? []) as unknown as MasteryReviewRawRow[]) ?? [];
+  const recentRows =
+    ((recentReviewRows.data ?? []) as unknown as RecentReviewRawRow[]) ?? [];
+  const masterySummaries = buildMasterySummaries(masteryRows);
   const totalToday = (pendingToday.count ?? 0) + (completedToday.count ?? 0);
 
   return {
@@ -191,24 +214,12 @@ export async function getStudentDashboardData(
     ),
     weakQuestionTypes: masterySummaries.slice(0, 5),
     levelMasteries: buildLevelMasteries(masterySummaries),
-    recentReviews: buildRecentReviews(completedRows).slice(0, 5),
+    recentReviews: buildRecentReviews(recentRows),
     sevenDaySummary: buildSevenDaySummary({
-      mistakes:
-        (recentMistakeRows.data ?? []) as Array<{
-          created_at: string | null;
-        }>,
-      reviews:
-        (recentCompletedReviewRows.data ?? []) as Array<{
-          completed_at: string | null;
-        }>,
-      practiceRecords:
-        (recentPracticeRecordRows.data ?? []) as Array<{
-          answered_at: string | null;
-        }>,
-      weakPracticeTasks:
-        (recentWeakPracticeRows.data ?? []) as Array<{
-          completed_at: string | null;
-        }>
+      newMistakeCount: recentMistakeCount.count ?? 0,
+      completedReviewCount: recentCompletedReviewCount.count ?? 0,
+      completedPracticeCount: recentPracticeRecordCount.count ?? 0,
+      completedWeakPracticeCount: recentWeakPracticeCount.count ?? 0
     }),
     error:
       pendingToday.error?.message ??
@@ -216,20 +227,21 @@ export async function getStudentDashboardData(
       weakPracticeToday.error?.message ??
       weakPracticeCompletedToday.error?.message ??
       completedDateRows.error?.message ??
-      completedReviewRows.error?.message ??
-      recentMistakeRows.error?.message ??
-      recentCompletedReviewRows.error?.message ??
-      recentPracticeRecordRows.error?.message ??
-      recentWeakPracticeRows.error?.message ??
+      masteryReviewRows.error?.message ??
+      recentReviewRows.error?.message ??
+      recentMistakeCount.error?.message ??
+      recentCompletedReviewCount.error?.message ??
+      recentPracticeRecordCount.error?.message ??
+      recentWeakPracticeCount.error?.message ??
       null
   };
 }
 
-function buildMasterySummaries(rows: CompletedReviewRawRow[]) {
+function buildMasterySummaries(rows: MasteryReviewRawRow[]) {
   const summaries = new Map<string, MasterySummary>();
 
   for (const row of rows) {
-    const mistake = normalizeMistake(row.mistakes);
+    const mistake = normalizeMasteryMistake(row.mistakes);
     const questionType = normalizeQuestionType(mistake?.question_types ?? null);
 
     if (!questionType || !row.result) {
@@ -300,11 +312,11 @@ function buildLevelMasteries(summaries: MasterySummary[]) {
   );
 }
 
-function buildRecentReviews(rows: CompletedReviewRawRow[]) {
+function buildRecentReviews(rows: RecentReviewRawRow[]) {
   const reviews: RecentReview[] = [];
 
   for (const row of rows) {
-    const mistake = normalizeMistake(row.mistakes);
+    const mistake = normalizeRecentMistake(row.mistakes);
 
     if (!mistake || !row.completed_at) {
       continue;
@@ -324,24 +336,21 @@ function buildRecentReviews(rows: CompletedReviewRawRow[]) {
 }
 
 function buildSevenDaySummary({
-  mistakes,
-  reviews,
-  practiceRecords,
-  weakPracticeTasks
+  newMistakeCount,
+  completedReviewCount,
+  completedPracticeCount,
+  completedWeakPracticeCount
 }: {
-  mistakes: Array<{ created_at: string | null }>;
-  reviews: Array<{ completed_at: string | null }>;
-  practiceRecords: Array<{ answered_at: string | null }>;
-  weakPracticeTasks: Array<{ completed_at: string | null }>;
+  newMistakeCount: number;
+  completedReviewCount: number;
+  completedPracticeCount: number;
+  completedWeakPracticeCount: number;
 }) {
   return {
-    newMistakeCount: mistakes.filter((row) => row.created_at).length,
-    completedReviewCount: reviews.filter((row) => row.completed_at).length,
-    completedPracticeCount: practiceRecords.filter((row) => row.answered_at)
-      .length,
-    completedWeakPracticeCount: weakPracticeTasks.filter(
-      (row) => row.completed_at
-    ).length
+    newMistakeCount,
+    completedReviewCount,
+    completedPracticeCount,
+    completedWeakPracticeCount
   };
 }
 
@@ -366,7 +375,11 @@ function normalizeQuestionType(
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-function normalizeMistake(value: CompletedReviewRawRow["mistakes"]) {
+function normalizeMasteryMistake(value: MasteryReviewRawRow["mistakes"]) {
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function normalizeRecentMistake(value: RecentReviewRawRow["mistakes"]) {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 

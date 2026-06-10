@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Save } from "lucide-react";
 import { LatexContentRenderer } from "@/components/problems/LatexContentRenderer";
+import { SubmitButton } from "@/components/submit-button";
 import { updateSolution } from "../actions";
 
 type SolutionEditFormProps = {
@@ -61,13 +62,13 @@ export function SolutionEditForm({
         </label>
 
         <div className="mt-5">
-          <button
-            type="submit"
+          <SubmitButton
+            pendingText="保存中..."
             className="inline-flex h-10 items-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white"
           >
             <Save className="h-4 w-4" />
             保存答案解析
-          </button>
+          </SubmitButton>
         </div>
       </form>
 

@@ -3,6 +3,7 @@ import { CheckCircle2, Search } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import { CascadingQuestionTypeFilters } from "@/components/question-types/CascadingQuestionTypeFilters";
+import { SubmitButton } from "@/components/submit-button";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   canManageQuestionTypes,
@@ -415,13 +416,13 @@ export default async function ReviewMistakesPage({
                   </details>
 
                   <div>
-                    <button
-                      type="submit"
+                    <SubmitButton
+                      pendingText="确认中..."
                       className="inline-flex h-10 items-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white"
                     >
                       <CheckCircle2 className="h-4 w-4" />
                       确认题型
-                    </button>
+                    </SubmitButton>
                   </div>
                 </form>
               </article>

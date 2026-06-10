@@ -72,43 +72,14 @@ export async function generateDailyWeakPractice(userId: string, date: string) {
   }
 
   const supabase = await createClient();
-  const [{ data: problemRows, error: problemsError }, weaknessScores] =
-    await Promise.all([
-      supabase
-        .from("problems")
-        .select("id, question_type_id, raw_latex, answer, analysis")
-        .not("question_type_id", "is", null),
-      calculateWeaknessScores(userId, date)
-    ]);
-
-  if (problemsError) {
-    throw new Error(`读取教师题库失败：${problemsError.message}`);
-  }
-
-  const candidates = ((problemRows ?? []) as Array<{
-    id: string;
-    question_type_id: string | null;
-    answer: string | null;
-    analysis: string | null;
-  }>)
-    .filter((problem) => Boolean(problem.question_type_id))
-    .map((problem) => ({
-      id: problem.id,
-      questionTypeId: problem.question_type_id as string,
-      hasSolution: Boolean(problem.answer?.trim() || problem.analysis?.trim())
-    }));
-
-  if (candidates.length === 0) {
-    return existingTasks;
-  }
+  const weaknessScores = await calculateWeaknessScores(userId, date);
 
   const existingProblemIds = new Set(
     existingTasks
       .map((task) => task.problem?.id)
       .filter((id): id is string => Boolean(id))
   );
-  const selected = selectPracticeProblems({
-    candidates,
+  const selected = await selectPracticeProblems({
     existingProblemIds,
     weaknessScores,
     targetCount: Math.max(0, 5 - existingTasks.length)
@@ -255,13 +226,11 @@ async function calculateWeaknessScores(userId: string, date: string) {
     .sort((left, right) => right.score - left.score);
 }
 
-function selectPracticeProblems({
-  candidates,
+async function selectPracticeProblems({
   existingProblemIds,
   weaknessScores,
   targetCount
 }: {
-  candidates: CandidateProblem[];
   existingProblemIds: Set<string>;
   weaknessScores: WeaknessScore[];
   targetCount: number;
@@ -276,8 +245,7 @@ function selectPracticeProblems({
     .slice(3, 4)
     .map((item) => item.questionTypeId);
 
-  pickIntoSelection({
-    candidates,
+  await pickIntoSelection({
     count: Math.min(3, targetCount),
     selected,
     sourceType: "weak",
@@ -286,8 +254,7 @@ function selectPracticeProblems({
   });
 
   if (selected.length < targetCount) {
-    pickIntoSelection({
-      candidates,
+    await pickIntoSelection({
       count: 1,
       selected,
       sourceType: "secondary",
@@ -303,8 +270,7 @@ function selectPracticeProblems({
   // intentional so the daily set can still be filled up to five tasks.
   while (selected.length < targetCount) {
     const before = selected.length;
-    pickIntoSelection({
-      candidates,
+    await pickIntoSelection({
       count: targetCount - selected.length,
       selected,
       sourceType: "random",
@@ -320,15 +286,13 @@ function selectPracticeProblems({
   return selected;
 }
 
-function pickIntoSelection({
-  candidates,
+async function pickIntoSelection({
   count,
   selected,
   sourceType,
   typeIds,
   usedProblemIds
 }: {
-  candidates: CandidateProblem[];
   count: number;
   selected: Array<{ problem: CandidateProblem; sourceType: SourceType }>;
   sourceType: SourceType;
@@ -339,19 +303,67 @@ function pickIntoSelection({
     return;
   }
 
-  const typeIdSet = new Set(typeIds);
-  const pool = shuffle(
-    candidates.filter(
-      (problem) =>
-        !usedProblemIds.has(problem.id) &&
-        (typeIds.length === 0 || typeIdSet.has(problem.questionTypeId))
-    )
-  ).sort((left, right) => Number(right.hasSolution) - Number(left.hasSolution));
+  const pool = await getCandidateProblems({
+    questionTypeIds: typeIds.length > 0 ? typeIds : null,
+    excludeProblemIds: usedProblemIds,
+    limit: count
+  });
 
   for (const problem of pool.slice(0, count)) {
     selected.push({ problem, sourceType });
     usedProblemIds.add(problem.id);
   }
+}
+
+async function getCandidateProblems({
+  questionTypeIds,
+  excludeProblemIds,
+  limit
+}: {
+  questionTypeIds: string[] | null;
+  excludeProblemIds: Set<string>;
+  limit: number;
+}) {
+  if (questionTypeIds && questionTypeIds.length === 0) {
+    return [];
+  }
+
+  const supabase = await createClient();
+  const oversampleLimit = Math.max(limit * 5, 10);
+  let query = supabase
+    .from("problems")
+    .select("id, question_type_id, answer, analysis")
+    .not("question_type_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(oversampleLimit);
+
+  if (questionTypeIds) {
+    query = query.in("question_type_id", questionTypeIds);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`读取教师题库失败：${error.message}`);
+  }
+
+  return shuffle(
+    ((data ?? []) as Array<{
+      id: string;
+      question_type_id: string | null;
+      answer: string | null;
+      analysis: string | null;
+    }>)
+      .filter((problem) => !excludeProblemIds.has(problem.id))
+      .filter((problem) => Boolean(problem.question_type_id))
+      .map((problem) => ({
+        id: problem.id,
+        questionTypeId: problem.question_type_id as string,
+        hasSolution: Boolean(problem.answer?.trim() || problem.analysis?.trim())
+      }))
+  )
+    .sort((left, right) => Number(right.hasSolution) - Number(left.hasSolution))
+    .slice(0, limit);
 }
 
 function normalizePracticeTask(row: PracticeTaskRawRow): WeakPracticeTask {

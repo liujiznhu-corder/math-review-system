@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
+import { SubmitButton } from "@/components/submit-button";
 
 export type QuestionTypeFormValue = {
   id?: string;
@@ -205,13 +206,13 @@ export function QuestionTypeForm({
       </section>
 
       <div className="flex flex-wrap gap-3">
-        <button
-          type="submit"
+        <SubmitButton
+          pendingText="保存中..."
           className="inline-flex h-10 items-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white"
         >
           <Save className="h-4 w-4" />
           {submitLabel}
-        </button>
+        </SubmitButton>
         <Link
           href="/question-types"
           className="inline-flex h-10 items-center rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink"

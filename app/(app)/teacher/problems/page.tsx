@@ -3,6 +3,7 @@ import { FilePenLine, Plus, Trash2 } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import { CascadingQuestionTypeFilters } from "@/components/question-types/CascadingQuestionTypeFilters";
+import { SubmitButton } from "@/components/submit-button";
 import {
   canManageQuestionTypes,
   getCurrentUserRole,
@@ -288,13 +289,13 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
 
                 <form action={deleteProblem} className="mt-4">
                   <input type="hidden" name="id" value={problem.id} />
-                  <button
-                    type="submit"
+                  <SubmitButton
+                    pendingText="删除中..."
                     className="inline-flex h-9 items-center gap-2 rounded-md border border-clay/25 bg-clay/10 px-3 text-sm font-medium text-clay"
                   >
                     <Trash2 className="h-4 w-4" />
                     删除
-                  </button>
+                  </SubmitButton>
                 </form>
               </article>
             ))}
@@ -367,12 +368,12 @@ function ProblemEditForm({
       </label>
       <TextArea name="source" label="来源" rows={2} value={problem.source} />
       <div>
-        <button
-          type="submit"
+        <SubmitButton
+          pendingText="保存中..."
           className="inline-flex h-10 items-center rounded-md bg-moss px-4 text-sm font-medium text-white"
         >
           保存修改
-        </button>
+        </SubmitButton>
       </div>
     </form>
   );
