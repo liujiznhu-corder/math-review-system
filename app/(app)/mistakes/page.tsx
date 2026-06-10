@@ -170,7 +170,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
 
                 <div className="mt-4">
                   <Link
-                    href={`/mistakes/${mistake.id}/answer`}
+                    href={`/mistakes/${mistake.id}/answer?returnUrl=${encodeURIComponent("/mistakes")}`}
                     className="inline-flex h-9 items-center gap-2 rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink hover:border-moss/40 hover:text-moss"
                   >
                     <Eye className="h-4 w-4" />

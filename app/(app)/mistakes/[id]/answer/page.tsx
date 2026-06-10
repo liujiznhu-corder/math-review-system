@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
+import { ContextBackLink } from "@/components/navigation/ContextBackLink";
 import { LatexContentRenderer } from "@/components/problems/LatexContentRenderer";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import { canManageQuestionTypes, getCurrentUserRole } from "@/lib/roles";
@@ -16,6 +16,7 @@ type AnswerPageProps = {
   }>;
   searchParams?: Promise<{
     message?: string;
+    returnUrl?: string;
   }>;
 };
 
@@ -59,13 +60,11 @@ export default async function MistakeAnswerPage({
 
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-6 py-8">
-      <Link
-        href={canManage ? "/teacher/dashboard" : "/mistakes"}
-        className="inline-flex items-center gap-2 text-sm font-medium text-ink/65 hover:text-ink"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        {canManage ? "返回教师仪表盘" : "返回错题库"}
-      </Link>
+      <ContextBackLink
+        fallbackHref={canManage ? "/teacher/dashboard" : "/mistakes"}
+        label={canManage ? "返回教师仪表盘" : "返回上一页"}
+        returnUrl={query?.returnUrl}
+      />
 
       <div className="mt-6">
         <p className="text-sm font-medium text-clay">错题答案</p>

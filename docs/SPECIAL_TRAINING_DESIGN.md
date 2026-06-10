@@ -685,3 +685,126 @@ Dashboard 增加：
 ### 与教师题库
 
 专项训练只消费教师题库，不维护教师题库。题目录入、答案解析和题库质量仍由教师 Web 端负责。
+
+---
+
+# V1 实现修订（2026-06-10）
+
+本次实现采用更收敛的 V1 范围：
+
+1. 只允许选择到三级题型后开始训练。
+   - 页面仍展示一级 / 二级 / 三级级联选择。
+   - `POST /api/student/practice/sessions` 只接收 `questionTypeId`。
+   - 未选择三级题型时返回 `VALIDATION_ERROR`。
+
+2. 每次训练固定 5 题。
+   - V1 不开放 10 / 15 题选择。
+   - `practice_sessions.question_count` 固定写入 5。
+
+3. 专项训练不复用 `review_tasks`。
+   - 新增 `practice_sessions`。
+   - 新增 `practice_records`。
+   - 今日复习和专项训练保持业务语义分离。
+
+4. V1 只记录专项训练数据。
+   - 暂不把 `practice_records` 纳入 Dashboard。
+   - 暂不影响 Top5 薄弱题型。
+   - 暂不影响薄弱巩固 `WeaknessScore`。
+
+5. 支持未掌握题目加入错题库。
+   - 总结页展示本次 `not_mastered` 题目。
+   - 学生点击“加入错题库”后，从 `problems` 创建 `mistakes`。
+   - `input_type = latex`。
+   - `latex_content` / `raw_latex` 使用 `problems.raw_latex`。
+   - `stem` / `raw_text` 使用 LaTeX 清洗后的文本，清洗为空时回退原始 LaTeX。
+   - `classification_status = student_selected`。
+   - `classified_by = student`。
+   - 插入 `mistakes` 后由数据库 trigger 自动生成复习任务。
+   - 使用 `source = practice_problem:<problem_id>` 避免重复加入同一道教师题库题目。
+
+## 当前已实现路由
+
+```text
+/practice
+```
+
+页面状态：
+- 入口状态：三级题型级联选择，开始训练。
+- 训练状态：显示第 X / 5 题、LaTeX 题目、题型、答案解析、已掌握 / 未掌握按钮。
+- 完成状态：显示总题数、已掌握、未掌握、未掌握题目列表、加入错题库、再练一次、返回首页。
+
+## 当前已实现 API
+
+```text
+GET /api/student/practice/options
+POST /api/student/practice/sessions
+GET /api/student/practice/sessions/[sessionId]
+POST /api/student/practice/records/[recordId]/complete
+POST /api/student/practice/sessions/[sessionId]/add-mistakes
+```
+
+统一返回格式：
+```json
+{ "ok": true, "data": {} }
+```
+
+失败返回：
+```json
+{ "ok": false, "error": { "code": "VALIDATION_ERROR", "message": "..." } }
+```
+
+权限：
+- 仅 student 可访问。
+- 未登录返回 `UNAUTHORIZED`。
+- teacher/admin 返回 `FORBIDDEN`。
+- 学生只能读取和更新自己的专项训练数据。
+
+## 当前已实现数据表
+
+```text
+practice_sessions
+practice_records
+```
+
+`practice_sessions`：记录一次训练。
+
+核心字段：
+- `user_id`
+- `question_type_id`
+- `question_count`
+- `status`: `active` / `completed` / `abandoned`
+- `started_at`
+- `completed_at`
+
+`practice_records`：记录训练中的每一道题。
+
+核心字段：
+- `session_id`
+- `user_id`
+- `problem_id`
+- `question_type_id`
+- `position`
+- `status`: `pending` / `completed`
+- `result`: `mastered` / `not_mastered` / `null`
+- `answered_at`
+- `added_to_mistakes_at`
+- `created_mistake_id`
+
+## 当前抽题策略
+
+学生选择三级题型后：
+
+1. 优先从该 `question_type_id` 抽题。
+2. 不足 5 题时，从同二级分类下其他三级题型补足。
+3. 再不足，从同一级分类下其他题型补足。
+4. 再不足，从全题库随机补足。
+5. 如果补足后仍不足 5 题，则返回题量不足错误。
+
+所有候选题来自教师题库 `problems`，且必须有 `question_type_id`。
+
+## 与现有模块边界
+
+- 今日复习：仍由 `mistakes` 和 `review_tasks` 驱动。
+- 薄弱巩固：仍由 `weak_practice_tasks` 驱动。
+- 专项训练：由 `practice_sessions` 和 `practice_records` 驱动。
+- 专项训练未掌握题只有在学生主动点击“加入错题库”时，才沉淀为 `mistakes` 并进入复习周期。

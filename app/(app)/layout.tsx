@@ -43,6 +43,11 @@ const studentNavigationItems = [
     href: "/weak-practice",
     label: "薄弱巩固",
     icon: Target
+  },
+  {
+    href: "/practice",
+    label: "专项训练",
+    icon: Target
   }
 ];
 

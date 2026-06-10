@@ -319,3 +319,55 @@ WeaknessScore = 错题数量 * 0.5 + 复习未掌握次数 * 0.3 + 最近7天错
 ```text
 supabase/migrations/202606100001_add_weak_practice_tasks.sql
 ```
+
+## 专项训练 V1
+
+学生端新增 `/practice`。专项训练用于让学生主动选择一个三级题型，从教师题库 `problems` 中固定抽取 5 题训练；它和今日复习、薄弱巩固是三个独立模块。
+
+边界说明：
+- 今日复习：基于学生自己的错题和 `review_tasks`。
+- 薄弱巩固：系统每天根据薄弱题型自动推荐，写入 `weak_practice_tasks`。
+- 专项训练：学生主动选择三级题型刷题，写入 `practice_sessions` 和 `practice_records`，V1 暂不影响 Dashboard、Top5 薄弱题型或 WeaknessScore。
+
+抽题规则：
+- 必须选择到三级题型才能开始。
+- 每次固定 5 题。
+- 优先从所选 `question_type_id` 抽题。
+- 不足 5 题时，按同二级分类、同一级分类、全题库随机的顺序补足。
+- 优先抽取已有 `answer` 或 `analysis` 的教师题库题目。
+
+训练流程：
+1. 学生进入 `/practice`。
+2. 选择一级 / 二级 / 三级题型，点击“开始训练”。
+3. 逐题查看 LaTeX 题目和答案解析。
+4. 对每题提交“已掌握”或“未掌握”。
+5. 全部完成后进入总结页。
+6. 总结页可将本次 `not_mastered` 题目加入错题库。
+
+未掌握加入错题库：
+- 从 `problems.raw_latex` 创建学生自己的 `mistakes`。
+- `classification_status = student_selected`，`classified_by = student`。
+- 使用 `source = practice_problem:<problem_id>` 避免同一道教师题库题目重复加入。
+- 插入 `mistakes` 后由数据库 trigger 自动生成 1、3、7、14、30 天复习任务。
+
+学生端 API 预留：
+- `GET /api/student/practice/options`
+- `POST /api/student/practice/sessions`
+- `GET /api/student/practice/sessions/[sessionId]`
+- `POST /api/student/practice/records/[recordId]/complete`
+- `POST /api/student/practice/sessions/[sessionId]/add-mistakes`
+
+所有接口只允许 `student` 访问，成功返回：
+```json
+{ "ok": true, "data": {} }
+```
+
+失败返回：
+```json
+{ "ok": false, "error": { "code": "VALIDATION_ERROR", "message": "..." } }
+```
+
+上线时请执行：
+```text
+supabase/migrations/202606100002_add_special_practice.sql
+```

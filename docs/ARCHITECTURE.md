@@ -1626,3 +1626,72 @@ URL 参数约定：
 7. 接入 OCR。
 8. 接入 AI 分类，但保持 `services/classifier.ts` 为唯一分类服务边界。
 9. 增加学习数据统计和教师端分析报表。
+
+---
+
+# 当前补充说明：专项训练 V1
+
+学生端新增 `/practice`，用于学生主动选择三级题型刷题。教师端不显示该入口，teacher/admin 访问时通过 `redirectTeacherToDashboard()` 重定向到 `/teacher/dashboard`。
+
+新增文件：
+```text
+app/(app)/practice/page.tsx
+app/(app)/practice/actions.ts
+components/practice/PracticeStartForm.tsx
+services/student/practice.ts
+```
+
+新增学生端 API：
+```text
+GET /api/student/practice/options
+POST /api/student/practice/sessions
+GET /api/student/practice/sessions/[sessionId]
+POST /api/student/practice/records/[recordId]/complete
+POST /api/student/practice/sessions/[sessionId]/add-mistakes
+```
+
+这些 API 复用 `services/student/practice.ts`，并通过 `requireStudentApiUser()` 统一限制为 student 账号访问。成功返回 `{ ok: true, data }`，失败返回 `{ ok: false, error: { code, message } }`。
+
+数据库新增：
+```text
+practice_sessions
+practice_records
+```
+
+`practice_sessions` 表示一次专项训练，记录学生、所选三级题型、固定题数、状态和开始/完成时间。`practice_records` 表示训练中的单题记录，记录 problem、位置、完成状态、掌握结果，以及是否已经加入错题库。
+
+RLS：
+- `practice_sessions`：学生只能 select/insert/update 自己的 session。
+- `practice_records`：学生只能 select/insert/update 自己的 record。
+- teacher/admin V1 不管理专项训练记录。
+
+抽题策略：
+- V1 必须选到三级题型。
+- 每次固定 5 题。
+- 优先从所选 `question_type_id` 抽题。
+- 不足时依次从同二级分类、同一级分类、全题库随机补足。
+- 同一 session 内通过唯一约束避免重复 problem。
+- 优先抽取已有 `answer` 或 `analysis` 的题目。
+
+和现有模块的边界：
+- 今日复习继续使用 `review_tasks`，基于学生自己的错题和复习周期。
+- 薄弱巩固继续使用 `weak_practice_tasks`，基于系统每日推荐。
+- 专项训练使用 `practice_sessions` / `practice_records`，V1 暂不影响 Dashboard、Top5 薄弱题型或 WeaknessScore。
+- 专项训练未掌握题默认不进入错题库，只有学生在总结页点击“加入错题库”时才创建 `mistakes`。
+
+未掌握加入错题库流程：
+```text
+practice_records.result = not_mastered
+↓
+学生点击“加入错题库”
+↓
+从 problems.raw_latex 创建 mistakes
+↓
+classification_status = student_selected
+classified_by = student
+source = practice_problem:<problem_id>
+↓
+mistakes insert trigger 生成 day1/day3/day7/day14/day30 review_tasks
+```
+
+`source = practice_problem:<problem_id>` 用于避免同一道教师题库题目被同一学生重复加入错题库，不新增 `mistakes` 字段。

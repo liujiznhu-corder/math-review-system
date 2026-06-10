@@ -74,6 +74,12 @@ async function StudentDashboard({ userId }: { userId: string }) {
           title="今日薄弱巩固"
           description={`今日 5 题，已完成 ${stats.weakPracticeCompletedCount} 题`}
         />
+        <DashboardShortcut
+          href="/practice"
+          icon={Target}
+          title="专项训练"
+          description="主动选择三级题型刷 5 题"
+        />
       </section>
 
       <section className="mt-8">

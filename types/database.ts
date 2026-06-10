@@ -381,6 +381,122 @@ export type Database = {
           }
         ];
       };
+      practice_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          question_type_id: string;
+          question_count: number;
+          status: "active" | "completed" | "abandoned";
+          started_at: string;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          question_type_id: string;
+          question_count?: number;
+          status?: "active" | "completed" | "abandoned";
+          started_at?: string;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          question_type_id?: string;
+          question_count?: number;
+          status?: "active" | "completed" | "abandoned";
+          started_at?: string;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "practice_sessions_question_type_id_fkey";
+            columns: ["question_type_id"];
+            referencedRelation: "question_types";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      practice_records: {
+        Row: {
+          id: string;
+          session_id: string;
+          user_id: string;
+          problem_id: string;
+          question_type_id: string | null;
+          position: number;
+          status: "pending" | "completed";
+          result: "mastered" | "not_mastered" | null;
+          answered_at: string | null;
+          added_to_mistakes_at: string | null;
+          created_mistake_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          user_id?: string;
+          problem_id: string;
+          question_type_id?: string | null;
+          position: number;
+          status?: "pending" | "completed";
+          result?: "mastered" | "not_mastered" | null;
+          answered_at?: string | null;
+          added_to_mistakes_at?: string | null;
+          created_mistake_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          user_id?: string;
+          problem_id?: string;
+          question_type_id?: string | null;
+          position?: number;
+          status?: "pending" | "completed";
+          result?: "mastered" | "not_mastered" | null;
+          answered_at?: string | null;
+          added_to_mistakes_at?: string | null;
+          created_mistake_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "practice_records_session_id_fkey";
+            columns: ["session_id"];
+            referencedRelation: "practice_sessions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "practice_records_problem_id_fkey";
+            columns: ["problem_id"];
+            referencedRelation: "problems";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "practice_records_question_type_id_fkey";
+            columns: ["question_type_id"];
+            referencedRelation: "question_types";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "practice_records_created_mistake_id_fkey";
+            columns: ["created_mistake_id"];
+            referencedRelation: "mistakes";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       knowledge_mastery: {
         Row: {
           id: string;

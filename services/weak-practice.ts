@@ -168,12 +168,13 @@ export async function completeWeakPracticeTask({
   result: Exclude<PracticeResult, null>;
 }) {
   const supabase = await createClient();
+  const completedAt = new Date().toISOString();
   const { error } = await supabase
     .from("weak_practice_tasks")
     .update({
       status: "completed",
       result,
-      completed_at: new Date().toISOString()
+      completed_at: completedAt
     })
     .eq("id", taskId)
     .eq("user_id", userId);
@@ -181,6 +182,11 @@ export async function completeWeakPracticeTask({
   if (error) {
     throw new Error(`更新薄弱巩固任务失败：${error.message}`);
   }
+  return {
+    taskId,
+    result,
+    completedAt
+  };
 }
 
 async function calculateWeaknessScores(userId: string, date: string) {

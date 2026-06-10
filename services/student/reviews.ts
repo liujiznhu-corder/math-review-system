@@ -13,6 +13,8 @@ export type TodayReviewTask = {
     displayLatex: string;
     inputType: "plain_text" | "latex";
     note: string | null;
+    answer: string | null;
+    analysis: string | null;
     hasAnswerContent: boolean;
     questionType: {
       level1: string;
@@ -81,6 +83,11 @@ type ProblemSolutionRow = {
   answer: string | null;
   analysis: string | null;
 };
+
+const retryReviewRounds = [
+  { days: 3, round: "retry_day3" },
+  { days: 7, round: "retry_day7" }
+] as const;
 
 export async function getTodayReviewTasks(
   userId?: string
@@ -188,6 +195,8 @@ function normalizeReviewTask(
             mistake.stem,
           inputType: mistake.input_type,
           note: mistake.note,
+          answer: problemSolution?.answer ?? mistake.answer,
+          analysis: problemSolution?.analysis ?? mistake.analysis,
           hasAnswerContent:
             hasContent(mistake.answer) ||
             hasContent(mistake.analysis) ||
@@ -199,10 +208,80 @@ function normalizeReviewTask(
   };
 }
 
+export async function completeTodayReviewTask({
+  userId,
+  taskId,
+  result
+}: {
+  userId: string;
+  taskId: string;
+  result: "mastered" | "not_mastered";
+}) {
+  const supabase = await createClient();
+  const { data: task, error: taskError } = await supabase
+    .from("review_tasks")
+    .select("id, user_id, mistake_id, question_type_id")
+    .eq("id", taskId)
+    .eq("user_id", userId)
+    .single();
+
+  if (taskError) {
+    throw new Error(`读取复习任务失败：${taskError.message}`);
+  }
+
+  const completedAt = new Date().toISOString();
+  const { error: updateError } = await supabase
+    .from("review_tasks")
+    .update({
+      status: "completed",
+      result,
+      completed_at: completedAt
+    })
+    .eq("id", task.id)
+    .eq("user_id", userId);
+
+  if (updateError) {
+    throw new Error(`更新复习任务失败：${updateError.message}`);
+  }
+
+  if (result === "not_mastered") {
+    const { error: retryError } = await supabase.from("review_tasks").insert(
+      retryReviewRounds.map((item) => ({
+        user_id: task.user_id,
+        mistake_id: task.mistake_id,
+        question_type_id: task.question_type_id,
+        interval_days: item.days,
+        due_date: addDays(completedAt, item.days),
+        review_date: addDays(completedAt, item.days),
+        review_round: item.round,
+        status: "pending"
+      }))
+    );
+
+    if (retryError) {
+      throw new Error(
+        `当前任务已完成，但追加复习任务失败：${retryError.message}`
+      );
+    }
+  }
+
+  return {
+    taskId: task.id,
+    result,
+    completedAt
+  };
+}
+
 function normalizeMistake(value: ReviewTaskRow["mistakes"]) {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
 function hasContent(value: string | null | undefined) {
   return Boolean(value?.trim());
+}
+
+function addDays(dateValue: string, days: number) {
+  const date = new Date(dateValue);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
 }
