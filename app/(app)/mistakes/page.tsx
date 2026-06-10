@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { Eye, Filter, Plus } from "lucide-react";
+import { Eye, Plus } from "lucide-react";
+import { Pagination } from "@/components/pagination";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import { CascadingQuestionTypeFilters } from "@/components/question-types/CascadingQuestionTypeFilters";
+import { getPaginationState } from "@/lib/pagination";
 import { redirectTeacherToDashboard } from "@/lib/roles";
 import {
-  getStudentMistakesPageData,
+  getStudentMistakesListPage,
   type StudentMistakeListItem
 } from "@/services/student/mistakes";
 
@@ -14,7 +16,11 @@ type MistakesPageProps = {
     level2?: string;
     level3?: string;
     questionTypeId?: string;
+    status?: string;
+    keyword?: string;
     message?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -24,18 +30,28 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
   await redirectTeacherToDashboard();
 
   const params = await searchParams;
-  const selectedLevel1 = params?.level1 ?? "";
-  const selectedLevel2 = params?.level2 ?? "";
-  const selectedLevel3 = params?.level3 ?? "";
-  const selectedQuestionTypeId = params?.questionTypeId ?? "";
-  const { questionTypes, mistakes: allMistakes, error } = await getStudentMistakesPageData(
-    selectedQuestionTypeId
-  );
-  const mistakes = filterMistakesByPath(allMistakes, {
-    level1: selectedLevel1,
-    level2: selectedLevel2,
-    level3: selectedLevel3
-  });
+  const filters = {
+    level1: params?.level1 ?? "",
+    level2: params?.level2 ?? "",
+    level3: params?.level3 ?? "",
+    questionTypeId: params?.questionTypeId ?? "",
+    status: params?.status ?? "",
+    keyword: params?.keyword ?? "",
+    page: params?.page,
+    pageSize: params?.pageSize
+  };
+  const pagination = getPaginationState(params);
+  const { questionTypes, mistakes, totalCount, error } =
+    await getStudentMistakesListPage({
+      level1: filters.level1,
+      level2: filters.level2,
+      level3: filters.level3,
+      questionTypeId: filters.questionTypeId,
+      status: filters.status,
+      keyword: filters.keyword,
+      from: pagination.from,
+      to: pagination.to
+    });
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-6 py-8">
@@ -69,57 +85,63 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
       ) : null}
 
       <section className="mt-8 rounded-md border border-ink/10 bg-white p-5 shadow-sm">
-        <form className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <form className="grid gap-4 lg:grid-cols-3">
+          <input type="hidden" name="page" value="1" />
           <CascadingQuestionTypeFilters
             questionTypes={questionTypes}
-            selectedLevel1={selectedLevel1}
-            selectedLevel2={selectedLevel2}
-            selectedLevel3={selectedLevel3}
-            selectedQuestionTypeId={selectedQuestionTypeId}
+            selectedLevel1={filters.level1}
+            selectedLevel2={filters.level2}
+            selectedLevel3={filters.level3}
+            selectedQuestionTypeId={filters.questionTypeId}
             hiddenQuestionTypeIdName="questionTypeId"
-            disableLegacyFields
-            className="grid flex-1 gap-3 sm:grid-cols-3"
+            className="contents"
           />
-          <label className="block flex-1 text-sm font-medium text-ink">
-            <span className="inline-flex items-center gap-2">
-              <Filter className="h-4 w-4 text-moss" />
-              按题型筛选
-            </span>
+
+          <label className="block text-sm font-medium text-ink">
+            分类状态
             <select
-              name="questionTypeId"
-              defaultValue={selectedQuestionTypeId}
+              name="status"
+              defaultValue={filters.status}
               className="mt-2 h-10 w-full rounded-md border border-ink/15 bg-white px-3 text-sm outline-none focus:border-moss"
             >
-              <option value="">全部题型</option>
-              {questionTypes.map((questionType) => (
-                <option key={questionType.id} value={questionType.id}>
-                  {questionType.level1} / {questionType.level2} /{" "}
-                  {questionType.level3}
-                </option>
-              ))}
+              <option value="">全部状态</option>
+              <option value="pending">待教师审核</option>
+              <option value="student_selected">学生已选择</option>
+              <option value="teacher_confirmed">教师已确认</option>
             </select>
           </label>
-          <button
-            type="submit"
-            className="inline-flex h-10 items-center justify-center rounded-md border border-ink/15 px-4 text-sm font-medium text-ink"
-          >
-            筛选
-          </button>
-          {selectedQuestionTypeId || selectedLevel1 || selectedLevel2 || selectedLevel3 ? (
+
+          <label className="block text-sm font-medium text-ink lg:col-span-2">
+            关键词搜索
+            <input
+              name="keyword"
+              defaultValue={filters.keyword}
+              placeholder="搜索题干 raw_latex / raw_text / stem"
+              className="mt-2 h-10 w-full rounded-md border border-ink/15 px-3 text-sm outline-none focus:border-moss"
+            />
+          </label>
+
+          <div className="flex gap-3 lg:col-span-3">
+            <button
+              type="submit"
+              className="inline-flex h-10 items-center justify-center rounded-md border border-ink/15 px-4 text-sm font-medium text-ink"
+            >
+              筛选
+            </button>
             <Link
               href="/mistakes"
               className="inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-ink/65 hover:text-ink"
             >
-              清除
+              清空
             </Link>
-          ) : null}
+          </div>
         </form>
       </section>
 
       <section className="mt-8">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-ink">错题列表</h2>
-          <p className="text-sm text-ink/60">共 {mistakes.length} 条</p>
+          <p className="text-sm text-ink/60">共 {totalCount} 条</p>
         </div>
 
         {mistakes.length === 0 ? (
@@ -181,6 +203,14 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
             ))}
           </div>
         )}
+
+        <Pagination
+          basePath="/mistakes"
+          searchParams={filters}
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          totalCount={totalCount}
+        />
       </section>
     </main>
   );
@@ -192,31 +222,6 @@ function formatDate(value: string) {
     month: "2-digit",
     day: "2-digit"
   }).format(new Date(value));
-}
-
-function filterMistakesByPath(
-  mistakes: StudentMistakeListItem[],
-  filters: {
-    level1: string;
-    level2: string;
-    level3: string;
-  }
-) {
-  return mistakes.filter((mistake) => {
-    if (filters.level1 && mistake.question_types?.level1 !== filters.level1) {
-      return false;
-    }
-
-    if (filters.level2 && mistake.question_types?.level2 !== filters.level2) {
-      return false;
-    }
-
-    if (filters.level3 && mistake.question_types?.level3 !== filters.level3) {
-      return false;
-    }
-
-    return true;
-  });
 }
 
 function getClassificationStatusLabel(

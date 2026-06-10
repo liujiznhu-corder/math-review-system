@@ -156,6 +156,23 @@ npm run lint
 npm run build
 ```
 
+## 列表分页
+
+以下列表页使用服务端分页，URL 参数统一为 `page` 和 `pageSize`：
+
+- `/teacher/review-mistakes`
+- `/teacher/problems`
+- `/teacher/solutions`
+- `/mistakes`
+
+默认每页 10 条，支持 10 / 20 / 50 条切换。筛选表单提交时会把 `page` 重置为 1；分页按钮会保留当前筛选条件，只修改 `page` 或 `pageSize`。通用分页组件位于 `components/pagination.tsx`，分页参数解析位于 `lib/pagination.ts`。
+
+示例：
+
+```text
+/teacher/problems?page=1&pageSize=10
+```
+
 ## 原生 LaTeX 题目录入
 
 教师或管理员可进入：

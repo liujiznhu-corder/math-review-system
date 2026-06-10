@@ -443,6 +443,8 @@ docs/ARCHITECTURE.md
 
 - 教师审核学生提交的 pending 错题。
 - 展示学生题目、学生备注、系统推荐 top 3。
+- 支持按提交人姓名 / 邮箱 / user_id、提交时间、推荐题型级联筛选、题干关键词筛选 pending 错题。
+- 每条待审核错题展示提交人姓名或邮箱、提交时间和学生 ID。
 - 教师选择最终题型并可填写教师备注。
 - 确认后更新原错题记录并创建复习任务。
 
@@ -1328,7 +1330,7 @@ app/(app)/reviews/actions.ts
 - `/teacher/solutions`：答案解析中心列表页，统一展示教师题库 `problems` 和已确认题型但尚未加入题库的学生错题 `mistakes`。
 - `/teacher/solutions/[id]`：答案解析编辑页，普通 problem 使用 UUID 路由，未加入题库的学生错题使用 `mistake_<id>` 路由；保存时分别维护 `problems.answer` / `problems.analysis` 或 `mistakes.answer` / `mistakes.analysis`，并使用 LaTeX 实时预览。
 - `/teacher/solutions` 中学生错题可点击“加入教师题库”，通过 service role 创建 `source_type = student_submitted` 的 `problems` 记录，并用 `source_mistake_id` 避免重复加入。
-- `/teacher/review-mistakes`：审核 pending 错题时只确认题型、教师备注和可选答案解析；确认后不自动创建 `problems`，题库沉淀只在答案解析中心由教师手动触发。
+- `/teacher/review-mistakes`：审核 pending 错题时只确认题型、教师备注和可选答案解析；确认后不自动创建 `problems`，题库沉淀只在答案解析中心由教师手动触发。页面支持提交人搜索、提交时间筛选、推荐题型级联筛选和题干关键词搜索。
 - `/teacher/problems` 和 `/teacher/problems/new`：只负责题目录入、题型归类、raw_latex 和来源信息，不再维护答案解析。
 
 答案解析中心统计：
@@ -1341,13 +1343,11 @@ app/(app)/reviews/actions.ts
 
 答案解析中心筛选：
 
-- 一级分类。
-- 二级分类。
-- 三级题型。
-- `problem_type`。
-- 答案是否已填写。
-- 解析是否已填写。
-- 来源类型：教师录入 / 学生提交。
+- 关键词搜索：题目、答案、解析、`raw_latex`。
+- 题型筛选：一级 / 二级 / 三级级联筛选。
+- 状态筛选：全部、待补答案、待补解析、已完成。
+- 来源筛选：全部、教师录入、学生提交。
+- 筛选区保持紧凑，不再拆分独立答案状态和解析状态筛选，也不重复展示两组题型筛选。
 - 提交人姓名、邮箱或用户 ID。
 - 关键词搜索 `raw_latex`、`normalized_text`、`answer`、`analysis`、`source`。
 
@@ -1695,3 +1695,45 @@ mistakes insert trigger 生成 day1/day3/day7/day14/day30 review_tasks
 ```
 
 `source = practice_problem:<problem_id>` 用于避免同一道教师题库题目被同一学生重复加入错题库，不新增 `mistakes` 字段。
+
+---
+
+# 当前补充说明：列表服务端分页
+
+长列表页面统一使用服务端分页，避免一次性读取全部数据后在前端分页。通用分页组件位于：
+
+```text
+components/pagination.tsx
+lib/pagination.ts
+```
+
+分页 URL 参数统一为：
+
+```text
+page
+pageSize
+```
+
+当前支持 `pageSize = 10 / 20 / 50`，默认每页 10 条。筛选表单提交时会将 `page` 重置为 1；分页按钮和每页数量切换会保留当前筛选条件。
+
+已接入分页的页面：
+
+- `/teacher/review-mistakes`：待审核错题列表，保留提交人、提交时间、推荐题型和题干关键词筛选。
+- `/teacher/problems`：教师题库列表，保留题型级联筛选、来源筛选和关键词搜索。
+- `/teacher/solutions`：答案解析中心，保留关键词、题型级联、答案解析状态和来源筛选。
+- `/mistakes`：学生错题库，保留题型级联、分类状态和关键词搜索。
+
+分页查询约定：
+
+- 读取 URL 中的 `page`、`pageSize` 和当前筛选条件。
+- Supabase 查询使用 `range(from, to)`。
+- 对单表列表使用 `{ count: "exact" }` 获取总数。
+- 翻页时只修改分页参数，不丢失筛选条件。
+
+分页相关索引：
+
+```sql
+mistakes(classification_status, created_at desc)
+problems(question_type_id, created_at desc)
+problems(created_at desc)
+```

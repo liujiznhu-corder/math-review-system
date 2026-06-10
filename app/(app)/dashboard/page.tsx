@@ -193,51 +193,35 @@ async function StudentDashboard({ userId }: { userId: string }) {
       <section className="mt-8 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
         <DashboardPanel
           icon={Activity}
-          title="错题掌握曲线"
-          description="最近 30 天复习结果时间轴。"
+          title="最近7天学习总结"
+          description="汇总最近一周的录题、复习、专项训练和薄弱巩固完成情况。"
         >
-          <div className="mt-5 flex h-40 items-end gap-1 overflow-x-auto pb-1">
-            {stats.timeline.map((day) => {
-              const total = day.mastered + day.notMastered;
-              const height = total > 0 ? Math.min(100, 18 + total * 16) : 6;
-
-              return (
-                <div
-                  key={day.date}
-                  title={`${day.date} 已掌握 ${day.mastered}，未掌握 ${day.notMastered}`}
-                  className="flex min-w-5 flex-1 flex-col items-center justify-end gap-1"
-                >
-                  <div
-                    className="w-full rounded-t-sm bg-moss"
-                    style={{ height: `${height}%` }}
-                  >
-                    {day.notMastered > 0 ? (
-                      <div
-                        className="w-full rounded-t-sm bg-clay"
-                        style={{
-                          height: `${Math.max(
-                            18,
-                            (day.notMastered / total) * 100
-                          )}%`
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                  <span className="text-[10px] text-ink/45">{day.label}</span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-3 flex gap-4 text-xs text-ink/55">
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-moss" />
-              已掌握
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-clay" />
-              未掌握
-            </span>
-          </div>
+          {hasSevenDaySummaryData(stats.sevenDaySummary) ? (
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <StudySummaryCard
+                label="新增错题"
+                value={stats.sevenDaySummary.newMistakeCount}
+                helper="最近7天录入的错题"
+              />
+              <StudySummaryCard
+                label="完成复习"
+                value={stats.sevenDaySummary.completedReviewCount}
+                helper="最近7天完成的复习任务"
+              />
+              <StudySummaryCard
+                label="专项训练"
+                value={stats.sevenDaySummary.completedPracticeCount}
+                helper="最近7天完成的专项训练题"
+              />
+              <StudySummaryCard
+                label="薄弱巩固"
+                value={stats.sevenDaySummary.completedWeakPracticeCount}
+                helper="最近7天完成的薄弱巩固题"
+              />
+            </div>
+          ) : (
+            <EmptyState text="最近还没有学习记录，完成复习或训练后这里会自动更新。" />
+          )}
         </DashboardPanel>
 
         <DashboardPanel
@@ -495,6 +479,24 @@ function MetricCard({
   );
 }
 
+function StudySummaryCard({
+  label,
+  value,
+  helper
+}: {
+  label: string;
+  value: number;
+  helper: string;
+}) {
+  return (
+    <div className="rounded-md border border-ink/10 bg-paper px-4 py-4">
+      <p className="text-2xl font-semibold text-ink">{value}</p>
+      <p className="mt-2 text-sm font-medium text-ink">{label}</p>
+      <p className="mt-1 text-xs leading-5 text-ink/55">{helper}</p>
+    </div>
+  );
+}
+
 function ProgressBar({ value }: { value: number }) {
   return (
     <div className="mt-2 h-2 rounded-full bg-paper">
@@ -511,6 +513,22 @@ function EmptyState({ text }: { text: string }) {
     <div className="mt-5 rounded-md border border-dashed border-ink/20 bg-paper px-4 py-8 text-center text-sm text-ink/60">
       {text}
     </div>
+  );
+}
+
+function hasSevenDaySummaryData(
+  summary: {
+    newMistakeCount: number;
+    completedReviewCount: number;
+    completedPracticeCount: number;
+    completedWeakPracticeCount: number;
+  }
+) {
+  return (
+    summary.newMistakeCount > 0 ||
+    summary.completedReviewCount > 0 ||
+    summary.completedPracticeCount > 0 ||
+    summary.completedWeakPracticeCount > 0
   );
 }
 

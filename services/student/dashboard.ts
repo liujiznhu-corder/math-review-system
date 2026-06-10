@@ -56,11 +56,11 @@ export type LevelMasterySummary = {
   masteryPercent: number;
 };
 
-export type TimelineDay = {
-  date: string;
-  label: string;
-  mastered: number;
-  notMastered: number;
+export type SevenDayStudySummary = {
+  newMistakeCount: number;
+  completedReviewCount: number;
+  completedPracticeCount: number;
+  completedWeakPracticeCount: number;
 };
 
 export type StudentDashboardData = {
@@ -73,7 +73,7 @@ export type StudentDashboardData = {
   weakQuestionTypes: MasterySummary[];
   levelMasteries: LevelMasterySummary[];
   recentReviews: RecentReview[];
-  timeline: TimelineDay[];
+  sevenDaySummary: SevenDayStudySummary;
   error: string | null;
 };
 
@@ -85,6 +85,8 @@ export async function getStudentDashboardData(
   const tomorrowKey = addDaysToDateKey(todayKey, 1);
   const todayStartIso = startOfDateIso(todayKey);
   const tomorrowStartIso = startOfDateIso(tomorrowKey);
+  const sevenDaysAgoKey = addDaysToDateKey(todayKey, -6);
+  const sevenDaysAgoStartIso = startOfDateIso(sevenDaysAgoKey);
 
   const [
     pendingToday,
@@ -92,7 +94,11 @@ export async function getStudentDashboardData(
     weakPracticeToday,
     weakPracticeCompletedToday,
     completedDateRows,
-    completedReviewRows
+    completedReviewRows,
+    recentMistakeRows,
+    recentCompletedReviewRows,
+    recentPracticeRecordRows,
+    recentWeakPracticeRows
   ] = await Promise.all([
     supabase
       .from("review_tasks")
@@ -135,7 +141,34 @@ export async function getStudentDashboardData(
       .eq("status", "completed")
       .not("completed_at", "is", null)
       .order("completed_at", { ascending: false })
-      .limit(300)
+      .limit(300),
+    supabase
+      .from("mistakes")
+      .select("id, created_at")
+      .eq("user_id", userId)
+      .gte("created_at", sevenDaysAgoStartIso)
+      .lt("created_at", tomorrowStartIso),
+    supabase
+      .from("review_tasks")
+      .select("id, completed_at")
+      .eq("user_id", userId)
+      .eq("status", "completed")
+      .gte("completed_at", sevenDaysAgoStartIso)
+      .lt("completed_at", tomorrowStartIso),
+    supabase
+      .from("practice_records")
+      .select("id, answered_at")
+      .eq("user_id", userId)
+      .eq("status", "completed")
+      .gte("answered_at", sevenDaysAgoStartIso)
+      .lt("answered_at", tomorrowStartIso),
+    supabase
+      .from("weak_practice_tasks")
+      .select("id, completed_at")
+      .eq("user_id", userId)
+      .eq("status", "completed")
+      .gte("completed_at", sevenDaysAgoStartIso)
+      .lt("completed_at", tomorrowStartIso)
   ]);
 
   const completedRows =
@@ -159,7 +192,24 @@ export async function getStudentDashboardData(
     weakQuestionTypes: masterySummaries.slice(0, 5),
     levelMasteries: buildLevelMasteries(masterySummaries),
     recentReviews: buildRecentReviews(completedRows).slice(0, 5),
-    timeline: buildTimeline(completedRows),
+    sevenDaySummary: buildSevenDaySummary({
+      mistakes:
+        (recentMistakeRows.data ?? []) as Array<{
+          created_at: string | null;
+        }>,
+      reviews:
+        (recentCompletedReviewRows.data ?? []) as Array<{
+          completed_at: string | null;
+        }>,
+      practiceRecords:
+        (recentPracticeRecordRows.data ?? []) as Array<{
+          answered_at: string | null;
+        }>,
+      weakPracticeTasks:
+        (recentWeakPracticeRows.data ?? []) as Array<{
+          completed_at: string | null;
+        }>
+    }),
     error:
       pendingToday.error?.message ??
       completedToday.error?.message ??
@@ -167,6 +217,10 @@ export async function getStudentDashboardData(
       weakPracticeCompletedToday.error?.message ??
       completedDateRows.error?.message ??
       completedReviewRows.error?.message ??
+      recentMistakeRows.error?.message ??
+      recentCompletedReviewRows.error?.message ??
+      recentPracticeRecordRows.error?.message ??
+      recentWeakPracticeRows.error?.message ??
       null
   };
 }
@@ -269,43 +323,26 @@ function buildRecentReviews(rows: CompletedReviewRawRow[]) {
   return reviews;
 }
 
-function buildTimeline(rows: CompletedReviewRawRow[]) {
-  const todayKey = getChinaDateKey(new Date());
-  const days = Array.from({ length: 30 }, (_, index) => {
-    const dateKey = addDaysToDateKey(todayKey, index - 29);
-    const [, month, day] = dateKey.split("-");
-
-    return {
-      date: dateKey,
-      label: `${Number(month)}/${Number(day)}`,
-      mastered: 0,
-      notMastered: 0
-    };
-  });
-  const dayMap = new Map(days.map((day) => [day.date, day]));
-
-  for (const row of rows) {
-    if (!row.completed_at || !row.result) {
-      continue;
-    }
-
-    const dateKey = getChinaDateKey(new Date(row.completed_at));
-    const day = dayMap.get(dateKey);
-
-    if (!day) {
-      continue;
-    }
-
-    if (row.result === "mastered") {
-      day.mastered += 1;
-    }
-
-    if (row.result === "not_mastered") {
-      day.notMastered += 1;
-    }
-  }
-
-  return days;
+function buildSevenDaySummary({
+  mistakes,
+  reviews,
+  practiceRecords,
+  weakPracticeTasks
+}: {
+  mistakes: Array<{ created_at: string | null }>;
+  reviews: Array<{ completed_at: string | null }>;
+  practiceRecords: Array<{ answered_at: string | null }>;
+  weakPracticeTasks: Array<{ completed_at: string | null }>;
+}) {
+  return {
+    newMistakeCount: mistakes.filter((row) => row.created_at).length,
+    completedReviewCount: reviews.filter((row) => row.completed_at).length,
+    completedPracticeCount: practiceRecords.filter((row) => row.answered_at)
+      .length,
+    completedWeakPracticeCount: weakPracticeTasks.filter(
+      (row) => row.completed_at
+    ).length
+  };
 }
 
 function calculateReviewStreak(completedAtValues: string[]) {

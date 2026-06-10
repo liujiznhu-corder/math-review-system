@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { FilePenLine, Plus, Trash2 } from "lucide-react";
+import { Pagination } from "@/components/pagination";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import { CascadingQuestionTypeFilters } from "@/components/question-types/CascadingQuestionTypeFilters";
-import { createClient } from "@/lib/supabase/server";
 import {
   canManageQuestionTypes,
   getCurrentUserRole,
   redirectStudentToDashboard
 } from "@/lib/roles";
+import { getPaginationState } from "@/lib/pagination";
+import { createClient } from "@/lib/supabase/server";
+import type { Database } from "@/types/database";
 import { deleteProblem, updateProblem } from "./actions";
 import { CopyLatexButton } from "./copy-latex-button";
-import type { Database } from "@/types/database";
 
 type QuestionTypeRow = Pick<
   Database["public"]["Tables"]["question_types"]["Row"],
@@ -39,13 +41,14 @@ type ProblemRawRow = Omit<ProblemRow, "question_types"> & {
 type ProblemsPageProps = {
   searchParams?: Promise<{
     message?: string;
-    problemType?: string;
     level1?: string;
     level2?: string;
     level3?: string;
     questionTypeId?: string;
     source?: string;
     keyword?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -54,14 +57,17 @@ export const dynamic = "force-dynamic";
 export default async function ProblemsPage({ searchParams }: ProblemsPageProps) {
   const params = await searchParams;
   const filters = {
-    problemType: params?.problemType ?? "",
     level1: params?.level1 ?? "",
     level2: params?.level2 ?? "",
     level3: params?.level3 ?? "",
     questionTypeId: params?.questionTypeId ?? "",
     source: params?.source ?? "",
-    keyword: params?.keyword ?? ""
+    keyword: params?.keyword ?? "",
+    page: params?.page ?? "",
+    pageSize: params?.pageSize ?? ""
   };
+  const pagination = getPaginationState(params);
+
   await redirectStudentToDashboard();
   const role = await getCurrentUserRole();
 
@@ -70,26 +76,27 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
   }
 
   const supabase = await createClient();
-  const [{ data: questionTypes }, { data: problems, error }] =
-    await Promise.all([
-      supabase
-        .from("question_types")
-        .select("id, level1, level2, level3")
-        .eq("is_active", true)
-        .order("level1", { ascending: true })
-        .order("level2", { ascending: true })
-        .order("level3", { ascending: true }),
-      supabase
-        .from("problems")
-        .select(
-          "id, problem_type, raw_latex, normalized_text, answer, analysis, source, question_type_id, created_at, question_types(id, level1, level2, level3)"
-        )
-        .order("created_at", { ascending: false })
-    ]);
+  const { data: questionTypes } = await supabase
+    .from("question_types")
+    .select("id, level1, level2, level3")
+    .eq("is_active", true)
+    .order("level1", { ascending: true })
+    .order("level2", { ascending: true })
+    .order("level3", { ascending: true });
   const questionTypeOptions = (questionTypes ?? []) as QuestionTypeRow[];
-  const normalizedProblems = filterProblems(
-    normalizeProblems((problems ?? []) as unknown as ProblemRawRow[]),
+  const matchingQuestionTypeIds = getMatchingQuestionTypeIds(
+    questionTypeOptions,
     filters
+  );
+  const { data: problems, error, count } = await buildProblemsQuery({
+    supabase,
+    filters,
+    questionTypeIds: matchingQuestionTypeIds,
+    from: pagination.from,
+    to: pagination.to
+  });
+  const normalizedProblems = normalizeProblems(
+    (problems ?? []) as unknown as ProblemRawRow[]
   );
 
   return (
@@ -101,8 +108,7 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
             已录入题目
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
-            这里显示教师沉淀的原生 LaTeX 题目。题型库仍只在 `/question-types`
-            管理。
+            这里显示教师沉淀的原生 LaTeX 题目。题型库仍只在 /question-types 管理。
           </p>
         </div>
         <Link
@@ -127,7 +133,8 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
       ) : null}
 
       <section className="mt-8 rounded-md border border-ink/10 bg-white p-5 shadow-sm">
-        <form className="grid gap-4 lg:grid-cols-6">
+        <form className="grid gap-4 lg:grid-cols-3">
+          <input type="hidden" name="page" value="1" />
           <CascadingQuestionTypeFilters
             questionTypes={questionTypeOptions}
             selectedLevel1={filters.level1}
@@ -135,81 +142,9 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
             selectedLevel3={filters.level3}
             selectedQuestionTypeId={filters.questionTypeId}
             hiddenQuestionTypeIdName="questionTypeId"
-            disableLegacyFields
             className="contents"
           />
-          <label className="block text-sm font-medium text-ink">
-            题目类型
-            <select
-              name="problemType"
-              defaultValue={filters.problemType}
-              className="mt-2 h-10 w-full rounded-md border border-ink/15 bg-white px-3 text-sm outline-none focus:border-moss"
-            >
-              <option value="">全部</option>
-              <option value="single_choice">单选题</option>
-              <option value="fill_blank">填空题</option>
-              <option value="calculation">计算题</option>
-            </select>
-          </label>
-          <label className="block text-sm font-medium text-ink">
-            一级分类
-            <select
-              name="level1"
-              defaultValue={filters.level1}
-              className="mt-2 h-10 w-full rounded-md border border-ink/15 bg-white px-3 text-sm outline-none focus:border-moss"
-            >
-              <option value="">全部</option>
-              {unique(questionTypeOptions.map((item) => item.level1)).map(
-                (level) => (
-                  <option key={level} value={level}>
-                    {level}
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-          <label className="block text-sm font-medium text-ink">
-            二级分类
-            <select
-              name="level2"
-              defaultValue={filters.level2}
-              className="mt-2 h-10 w-full rounded-md border border-ink/15 bg-white px-3 text-sm outline-none focus:border-moss"
-            >
-              <option value="">全部</option>
-              {unique(
-                questionTypeOptions
-                  .filter(
-                    (item) => !filters.level1 || item.level1 === filters.level1
-                  )
-                  .map((item) => item.level2)
-              ).map((level) => (
-                <option key={level} value={level}>
-                  {level}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm font-medium text-ink">
-            三级题型
-            <select
-              name="questionTypeId"
-              defaultValue={filters.questionTypeId}
-              className="mt-2 h-10 w-full rounded-md border border-ink/15 bg-white px-3 text-sm outline-none focus:border-moss"
-            >
-              <option value="">全部</option>
-              {questionTypeOptions
-                .filter(
-                  (item) =>
-                    (!filters.level1 || item.level1 === filters.level1) &&
-                    (!filters.level2 || item.level2 === filters.level2)
-                )
-                .map((questionType) => (
-                  <option key={questionType.id} value={questionType.id}>
-                    {questionType.level3}
-                  </option>
-                ))}
-            </select>
-          </label>
+
           <label className="block text-sm font-medium text-ink">
             来源
             <input
@@ -219,16 +154,18 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
               className="mt-2 h-10 w-full rounded-md border border-ink/15 px-3 text-sm outline-none focus:border-moss"
             />
           </label>
-          <label className="block text-sm font-medium text-ink">
-            关键词
+
+          <label className="block text-sm font-medium text-ink lg:col-span-2">
+            关键词搜索
             <input
               name="keyword"
               defaultValue={filters.keyword}
-              placeholder="搜 raw_latex / 文本"
+              placeholder="搜索 raw_latex / normalized_text"
               className="mt-2 h-10 w-full rounded-md border border-ink/15 px-3 text-sm outline-none focus:border-moss"
             />
           </label>
-          <div className="flex gap-3 lg:col-span-6">
+
+          <div className="flex gap-3 lg:col-span-3">
             <button
               type="submit"
               className="inline-flex h-10 items-center rounded-md bg-moss px-4 text-sm font-medium text-white"
@@ -239,7 +176,7 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
               href="/teacher/problems"
               className="inline-flex h-10 items-center rounded-md px-4 text-sm font-medium text-ink/65 hover:text-ink"
             >
-              清除
+              清空
             </Link>
           </div>
         </form>
@@ -332,16 +269,6 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
                   </span>
                 </div>
 
-                {problem.answer ? (
-                  <p className="mt-3 text-sm leading-6 text-ink/55">
-                    答案状态：已填写
-                  </p>
-                ) : null}
-                {problem.analysis ? (
-                  <p className="mt-1 text-sm leading-6 text-ink/55">
-                    解析状态：已填写
-                  </p>
-                ) : null}
                 {problem.source ? (
                   <p className="mt-3 text-sm leading-6 text-ink/55">
                     来源：{problem.source}
@@ -373,6 +300,13 @@ export default async function ProblemsPage({ searchParams }: ProblemsPageProps) 
             ))}
           </div>
         )}
+        <Pagination
+          basePath="/teacher/problems"
+          searchParams={filters}
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          totalCount={count ?? 0}
+        />
       </section>
     </main>
   );
@@ -386,7 +320,10 @@ function ProblemEditForm({
   questionTypes: QuestionTypeRow[];
 }) {
   return (
-    <form action={updateProblem} className="mt-4 grid gap-4 rounded-md border border-ink/10 bg-paper p-4">
+    <form
+      action={updateProblem}
+      className="mt-4 grid gap-4 rounded-md border border-ink/10 bg-paper p-4"
+    >
       <input type="hidden" name="id" value={problem.id} />
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block text-sm font-medium text-ink">
@@ -474,68 +411,86 @@ function normalizeProblems(rows: ProblemRawRow[]): ProblemRow[] {
   }));
 }
 
-function filterProblems(
-  problems: ProblemRow[],
+async function buildProblemsQuery({
+  supabase,
+  filters,
+  questionTypeIds,
+  from,
+  to
+}: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
   filters: {
-    problemType: string;
     level1: string;
     level2: string;
     level3: string;
     questionTypeId: string;
     source: string;
     keyword: string;
+  };
+  questionTypeIds: string[] | null;
+  from: number;
+  to: number;
+}) {
+  if (questionTypeIds && questionTypeIds.length === 0) {
+    return {
+      data: [],
+      error: null,
+      count: 0
+    };
   }
-) {
-  const normalizedSource = filters.source.trim().toLowerCase();
-  const normalizedKeyword = filters.keyword.trim().toLowerCase();
 
-  return problems.filter((problem) => {
-    if (filters.problemType && problem.problem_type !== filters.problemType) {
-      return false;
-    }
+  let query = supabase
+    .from("problems")
+    .select(
+      "id, problem_type, raw_latex, normalized_text, answer, analysis, source, question_type_id, created_at, question_types(id, level1, level2, level3)",
+      { count: "exact" }
+    )
+    .order("created_at", { ascending: false });
 
-    if (
-      filters.questionTypeId &&
-      problem.question_type_id !== filters.questionTypeId
-    ) {
-      return false;
-    }
+  if (questionTypeIds) {
+    query = query.in("question_type_id", questionTypeIds);
+  }
 
-    if (filters.level1 && problem.question_types?.level1 !== filters.level1) {
-      return false;
-    }
+  const normalizedSource = filters.source.trim();
+  if (normalizedSource) {
+    query = query.ilike("source", `%${normalizedSource}%`);
+  }
 
-    if (filters.level2 && problem.question_types?.level2 !== filters.level2) {
-      return false;
-    }
+  const normalizedKeyword = filters.keyword.trim();
+  if (normalizedKeyword) {
+    query = query.or(
+      `raw_latex.ilike.%${normalizedKeyword}%,normalized_text.ilike.%${normalizedKeyword}%`
+    );
+  }
 
-    if (filters.level3 && problem.question_types?.level3 !== filters.level3) {
-      return false;
-    }
-
-    if (
-      normalizedSource &&
-      !(problem.source ?? "").toLowerCase().includes(normalizedSource)
-    ) {
-      return false;
-    }
-
-    if (normalizedKeyword) {
-      const searchable = `${problem.raw_latex} ${
-        problem.normalized_text ?? ""
-      }`.toLowerCase();
-
-      if (!searchable.includes(normalizedKeyword)) {
-        return false;
-      }
-    }
-
-    return true;
-  });
+  return query.range(from, to);
 }
 
-function unique(values: string[]) {
-  return Array.from(new Set(values.filter(Boolean)));
+function getMatchingQuestionTypeIds(
+  questionTypes: QuestionTypeRow[],
+  filters: {
+    level1: string;
+    level2: string;
+    level3: string;
+    questionTypeId: string;
+  }
+) {
+  if (filters.questionTypeId) {
+    return [filters.questionTypeId];
+  }
+
+  if (!filters.level1 && !filters.level2 && !filters.level3) {
+    return null;
+  }
+
+  return questionTypes
+    .filter(
+      (questionType) =>
+        (!filters.level1 || questionType.level1 === filters.level1) &&
+        (!filters.level2 || questionType.level2 === filters.level2) &&
+        (!filters.level3 || questionType.level3 === filters.level3)
+    )
+    .map((questionType) => questionType.id);
 }
 
 function getProblemTypeLabel(value: ProblemRow["problem_type"]) {

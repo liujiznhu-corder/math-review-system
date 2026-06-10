@@ -223,10 +223,13 @@ create index if not exists question_types_keywords_idx on public.question_types 
 create index if not exists question_type_examples_type_idx on public.question_type_examples (question_type_id);
 create index if not exists problems_question_type_idx on public.problems (question_type_id);
 create index if not exists problems_created_by_idx on public.problems (created_by, created_at desc);
+create index if not exists problems_question_type_created_idx on public.problems (question_type_id, created_at desc);
+create index if not exists problems_created_idx on public.problems (created_at desc);
 create index if not exists problems_source_type_idx on public.problems (source_type, updated_at desc);
 create unique index if not exists problems_source_mistake_unique_idx on public.problems (source_mistake_id) where source_mistake_id is not null;
 create index if not exists mistakes_user_created_idx on public.mistakes (user_id, created_at desc);
 create index if not exists mistakes_type_idx on public.mistakes (question_type_id);
+create index if not exists mistakes_status_created_idx on public.mistakes (classification_status, created_at desc);
 create index if not exists mistakes_problem_type_idx on public.mistakes (problem_type);
 create index if not exists review_tasks_user_due_idx on public.review_tasks (user_id, due_date, status);
 create index if not exists review_tasks_user_review_idx on public.review_tasks (user_id, review_date, status);

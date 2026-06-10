@@ -68,6 +68,89 @@ export async function getStudentMistakesPageData(
   };
 }
 
+export async function getStudentMistakesListPage({
+  userId,
+  level1,
+  level2,
+  level3,
+  questionTypeId,
+  status,
+  keyword,
+  from,
+  to
+}: {
+  userId?: string;
+  level1: string;
+  level2: string;
+  level3: string;
+  questionTypeId: string;
+  status: string;
+  keyword: string;
+  from: number;
+  to: number;
+}) {
+  const supabase = await createClient();
+  const { data: questionTypes } = await supabase
+    .from("question_types")
+    .select("id, level1, level2, level3")
+    .eq("is_active", true)
+    .order("level1", { ascending: true })
+    .order("level2", { ascending: true })
+    .order("level3", { ascending: true });
+  const questionTypeRows = (questionTypes ?? []) as StudentMistakeQuestionType[];
+  const matchingQuestionTypeIds = getMatchingQuestionTypeIds(questionTypeRows, {
+    level1,
+    level2,
+    level3,
+    questionTypeId
+  });
+
+  if (matchingQuestionTypeIds && matchingQuestionTypeIds.length === 0) {
+    return {
+      questionTypes: questionTypeRows,
+      mistakes: [],
+      totalCount: 0,
+      error: null
+    };
+  }
+
+  let query = supabase
+    .from("mistakes")
+    .select(
+      "id, stem, created_at, question_type_id, input_type, raw_text, raw_latex, latex_content, classification_status, question_types(id, level1, level2, level3)",
+      { count: "exact" }
+    )
+    .order("created_at", { ascending: false });
+
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  if (matchingQuestionTypeIds) {
+    query = query.in("question_type_id", matchingQuestionTypeIds);
+  }
+
+  if (status) {
+    query = query.eq("classification_status", status);
+  }
+
+  const normalizedKeyword = keyword.trim();
+  if (normalizedKeyword) {
+    query = query.or(
+      `raw_latex.ilike.%${normalizedKeyword}%,raw_text.ilike.%${normalizedKeyword}%,stem.ilike.%${normalizedKeyword}%`
+    );
+  }
+
+  const { data, error, count } = await query.range(from, to);
+
+  return {
+    questionTypes: questionTypeRows,
+    mistakes: normalizeMistakes((data ?? []) as unknown as MistakeRawRow[]),
+    totalCount: count ?? 0,
+    error
+  };
+}
+
 export async function getStudentSelectableQuestionTypes() {
   const supabase = await createClient();
   const { data } = await supabase
@@ -140,4 +223,31 @@ function normalizeMistakes(rows: MistakeRawRow[]): StudentMistakeListItem[] {
       ? (row.question_types[0] ?? null)
       : row.question_types
   }));
+}
+
+function getMatchingQuestionTypeIds(
+  questionTypes: StudentMistakeQuestionType[],
+  filters: {
+    level1: string;
+    level2: string;
+    level3: string;
+    questionTypeId: string;
+  }
+) {
+  if (filters.questionTypeId) {
+    return [filters.questionTypeId];
+  }
+
+  if (!filters.level1 && !filters.level2 && !filters.level3) {
+    return null;
+  }
+
+  return questionTypes
+    .filter(
+      (questionType) =>
+        (!filters.level1 || questionType.level1 === filters.level1) &&
+        (!filters.level2 || questionType.level2 === filters.level2) &&
+        (!filters.level3 || questionType.level3 === filters.level3)
+    )
+    .map((questionType) => questionType.id);
 }

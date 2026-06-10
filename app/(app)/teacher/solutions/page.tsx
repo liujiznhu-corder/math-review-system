@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FilePenLine, LibraryBig, Search } from "lucide-react";
+import { Pagination } from "@/components/pagination";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import { CascadingQuestionTypeFilters } from "@/components/question-types/CascadingQuestionTypeFilters";
 import {
@@ -7,6 +8,7 @@ import {
   getCurrentUserRole,
   redirectStudentToDashboard
 } from "@/lib/roles";
+import { getPaginationState } from "@/lib/pagination";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/types/database";
 import { CopyLatexButton } from "../problems/copy-latex-button";
@@ -81,16 +83,15 @@ type SolutionRow = {
 type SolutionsPageProps = {
   searchParams?: Promise<{
     message?: string;
-    problemType?: string;
     level1?: string;
     level2?: string;
     level3?: string;
     questionTypeId?: string;
-    answerStatus?: string;
-    analysisStatus?: string;
+    status?: string;
     sourceType?: string;
-    submitter?: string;
     keyword?: string;
+    page?: string;
+    pageSize?: string;
   }>;
 };
 
@@ -108,43 +109,50 @@ export default async function SolutionsPage({
 
   const params = await searchParams;
   const filters = {
-    problemType: params?.problemType ?? "",
     level1: params?.level1 ?? "",
     level2: params?.level2 ?? "",
     level3: params?.level3 ?? "",
     questionTypeId: params?.questionTypeId ?? "",
-    answerStatus: params?.answerStatus ?? "",
-    analysisStatus: params?.analysisStatus ?? "",
+    status: params?.status ?? "",
     sourceType: params?.sourceType ?? "",
-    submitter: params?.submitter ?? "",
-    keyword: params?.keyword ?? ""
+    keyword: params?.keyword ?? "",
+    page: params?.page,
+    pageSize: params?.pageSize
   };
+  const pagination = getPaginationState(params);
 
   const admin = createAdminClient();
-  const [{ data: questionTypes }, { data: problems, error: problemsError }, { data: mistakes, error: mistakesError }] =
-    await Promise.all([
-      admin
-        .from("question_types")
-        .select("id, level1, level2, level3")
-        .eq("is_active", true)
-        .order("level1", { ascending: true })
-        .order("level2", { ascending: true })
-        .order("level3", { ascending: true }),
-      admin
-        .from("problems")
-        .select(
-          "id, created_by, question_type_id, problem_type, raw_latex, normalized_text, answer, analysis, source, source_type, source_mistake_id, updated_at, question_types(id, level1, level2, level3)"
-        )
-        .order("updated_at", { ascending: false }),
-      admin
-        .from("mistakes")
-        .select(
-          "id, user_id, question_type_id, problem_type, stem, raw_latex, latex_content, normalized_stem, answer, analysis, source, updated_at, question_types(id, level1, level2, level3)"
-        )
-        .not("question_type_id", "is", null)
-        .in("classification_status", ["student_selected", "teacher_confirmed"])
-        .order("updated_at", { ascending: false })
-    ]);
+  const [
+    { data: questionTypes },
+    { data: problems, error: problemsError, count: problemsCount },
+    { data: mistakes, error: mistakesError, count: mistakesCount }
+  ] = await Promise.all([
+    admin
+      .from("question_types")
+      .select("id, level1, level2, level3")
+      .eq("is_active", true)
+      .order("level1", { ascending: true })
+      .order("level2", { ascending: true })
+      .order("level3", { ascending: true }),
+    admin
+      .from("problems")
+      .select(
+        "id, created_by, question_type_id, problem_type, raw_latex, normalized_text, answer, analysis, source, source_type, source_mistake_id, updated_at, question_types(id, level1, level2, level3)",
+        { count: "exact" }
+      )
+      .order("updated_at", { ascending: false })
+      .range(0, pagination.to),
+    admin
+      .from("mistakes")
+      .select(
+        "id, user_id, question_type_id, problem_type, stem, raw_latex, latex_content, normalized_stem, answer, analysis, source, updated_at, question_types(id, level1, level2, level3)",
+        { count: "exact" }
+      )
+      .not("question_type_id", "is", null)
+      .in("classification_status", ["student_selected", "teacher_confirmed"])
+      .order("updated_at", { ascending: false })
+      .range(0, pagination.to)
+  ]);
 
   const problemRows = normalizeProblemRows(
     (problems ?? []) as unknown as ProblemRow[]
@@ -168,23 +176,34 @@ export default async function SolutionsPage({
     submitter: row.createdBy ? (submitters.get(row.createdBy) ?? null) : null
   }));
   const filteredRows = filterRows(rows, filters);
+  const paginatedRows = filteredRows.slice(
+    pagination.from,
+    pagination.from + pagination.pageSize
+  );
   const stats = buildStats(rows);
   const questionTypeOptions = (questionTypes ?? []) as QuestionTypeRow[];
   const pageError = problemsError?.message ?? mistakesError?.message;
+  const totalCount =
+    filters.keyword ||
+    filters.level1 ||
+    filters.level2 ||
+    filters.level3 ||
+    filters.questionTypeId ||
+    filters.status ||
+    filters.sourceType
+      ? filteredRows.length
+      : (problemsCount ?? 0) + (mistakesCount ?? 0);
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-6 py-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-clay">教师端</p>
-          <h1 className="mt-1 text-2xl font-semibold text-ink">
-            答案解析中心
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
-            统一维护教师题库和学生已确认错题的答案解析。答案与解析以原始
-            LaTeX/Markdown 源码保存，学生端只负责查看。
-          </p>
-        </div>
+      <div>
+        <p className="text-sm font-medium text-clay">教师端</p>
+        <h1 className="mt-1 text-2xl font-semibold text-ink">
+          答案解析中心
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
+          统一维护教师题库和学生已确认错题的答案解析。答案与解析以原始 LaTeX/Markdown 源码保存，学生端只负责查看。
+        </p>
       </div>
 
       {params?.message ? (
@@ -208,7 +227,15 @@ export default async function SolutionsPage({
       </section>
 
       <section className="mt-8 rounded-md border border-ink/10 bg-white p-5 shadow-sm">
-        <form className="grid gap-4 lg:grid-cols-5">
+        <form className="grid gap-4 xl:grid-cols-6">
+          <input type="hidden" name="page" value="1" />
+          <TextField
+            name="keyword"
+            label="关键词搜索"
+            value={filters.keyword}
+            placeholder="搜索题目 / 答案 / 解析 / raw_latex"
+            className="xl:col-span-2"
+          />
           <CascadingQuestionTypeFilters
             questionTypes={questionTypeOptions}
             selectedLevel1={filters.level1}
@@ -216,70 +243,22 @@ export default async function SolutionsPage({
             selectedLevel3={filters.level3}
             selectedQuestionTypeId={filters.questionTypeId}
             hiddenQuestionTypeIdName="questionTypeId"
-            disableLegacyFields
             className="contents"
           />
           <SelectField
-            name="problemType"
-            label="题目类型"
-            value={filters.problemType}
+            name="status"
+            label="状态筛选"
+            value={filters.status}
             options={[
               ["", "全部"],
-              ["single_choice", "单选题"],
-              ["fill_blank", "填空题"],
-              ["calculation", "计算题"]
+              ["missing_answer", "待补答案"],
+              ["missing_analysis", "待补解析"],
+              ["completed", "已完成"]
             ]}
           />
-          <SelectField
-            name="level1"
-            label="一级分类"
-            value={filters.level1}
-            options={[
-              ["", "全部"],
-              ...unique(questionTypeOptions.map((item) => item.level1)).map(
-                (item): [string, string] => [item, item]
-              )
-            ]}
-          />
-          <SelectField
-            name="level2"
-            label="二级分类"
-            value={filters.level2}
-            options={[
-              ["", "全部"],
-              ...unique(
-                questionTypeOptions
-                  .filter(
-                    (item) => !filters.level1 || item.level1 === filters.level1
-                  )
-                  .map((item) => item.level2)
-              ).map((item): [string, string] => [item, item])
-            ]}
-          />
-          <label className="block text-sm font-medium text-ink">
-            三级题型
-            <select
-              name="questionTypeId"
-              defaultValue={filters.questionTypeId}
-              className="mt-2 h-10 w-full rounded-md border border-ink/15 bg-white px-3 text-sm outline-none focus:border-moss"
-            >
-              <option value="">全部</option>
-              {questionTypeOptions
-                .filter(
-                  (item) =>
-                    (!filters.level1 || item.level1 === filters.level1) &&
-                    (!filters.level2 || item.level2 === filters.level2)
-                )
-                .map((questionType) => (
-                  <option key={questionType.id} value={questionType.id}>
-                    {questionType.level3}
-                  </option>
-                ))}
-            </select>
-          </label>
           <SelectField
             name="sourceType"
-            label="来源类型"
+            label="来源筛选"
             value={filters.sourceType}
             options={[
               ["", "全部"],
@@ -287,39 +266,7 @@ export default async function SolutionsPage({
               ["student_submitted", "学生提交"]
             ]}
           />
-          <SelectField
-            name="answerStatus"
-            label="答案状态"
-            value={filters.answerStatus}
-            options={[
-              ["", "全部"],
-              ["filled", "已填写"],
-              ["missing", "未填写"]
-            ]}
-          />
-          <SelectField
-            name="analysisStatus"
-            label="解析状态"
-            value={filters.analysisStatus}
-            options={[
-              ["", "全部"],
-              ["filled", "已填写"],
-              ["missing", "未填写"]
-            ]}
-          />
-          <TextField
-            name="submitter"
-            label="提交人"
-            value={filters.submitter}
-            placeholder="姓名 / 邮箱 / ID"
-          />
-          <TextField
-            name="keyword"
-            label="关键词"
-            value={filters.keyword}
-            placeholder="搜索题目 / 答案 / 解析"
-          />
-          <div className="flex items-end gap-3">
+          <div className="flex items-end gap-3 xl:col-span-2">
             <button
               type="submit"
               className="inline-flex h-10 items-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white"
@@ -331,20 +278,20 @@ export default async function SolutionsPage({
               href="/teacher/solutions"
               className="inline-flex h-10 items-center rounded-md px-4 text-sm font-medium text-ink/65 hover:text-ink"
             >
-              清除
+              清空
             </Link>
           </div>
         </form>
       </section>
 
       <section className="mt-8">
-        {filteredRows.length === 0 ? (
+        {paginatedRows.length === 0 ? (
           <div className="rounded-md border border-dashed border-ink/20 bg-white px-5 py-10 text-center text-sm text-ink/60">
             暂无符合条件的题目。
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredRows.map((row) => (
+            {paginatedRows.map((row) => (
               <article
                 key={`${row.solutionType}:${row.id}`}
                 className="rounded-md border border-ink/10 bg-white p-5 shadow-sm"
@@ -354,9 +301,13 @@ export default async function SolutionsPage({
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge text={getSourceTypeLabel(row.sourceType)} />
                       <Badge text={getProblemTypeLabel(row.problemType)} />
-                      <Badge text={row.isInProblemLibrary ? "已加入题库" : "未加入题库"} />
+                      <Badge
+                        text={row.isInProblemLibrary ? "已加入题库" : "未加入题库"}
+                      />
                       <Badge text={hasContent(row.answer) ? "答案已填" : "待补答案"} />
-                      <Badge text={hasContent(row.analysis) ? "解析已填" : "待补解析"} />
+                      <Badge
+                        text={hasContent(row.analysis) ? "解析已填" : "待补解析"}
+                      />
                     </div>
                     <div className="mt-3 rounded-md bg-paper p-4">
                       <LatexProblemRenderer rawLatex={row.rawLatex} />
@@ -425,6 +376,13 @@ export default async function SolutionsPage({
             ))}
           </div>
         )}
+        <Pagination
+          basePath="/teacher/solutions"
+          searchParams={filters}
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          totalCount={totalCount}
+        />
       </section>
     </main>
   );
@@ -472,15 +430,17 @@ function TextField({
   name,
   label,
   value,
-  placeholder
+  placeholder,
+  className
 }: {
   name: string;
   label: string;
   value: string;
   placeholder: string;
+  className?: string;
 }) {
   return (
-    <label className="block text-sm font-medium text-ink">
+    <label className={`block text-sm font-medium text-ink ${className ?? ""}`}>
       {label}
       <input
         name={name}
@@ -573,26 +533,18 @@ function normalizeMistakeRows(
 function filterRows(
   rows: SolutionRow[],
   filters: {
-    problemType: string;
     level1: string;
     level2: string;
     level3: string;
     questionTypeId: string;
-    answerStatus: string;
-    analysisStatus: string;
+    status: string;
     sourceType: string;
-    submitter: string;
     keyword: string;
   }
 ) {
-  const submitterFilter = filters.submitter.trim().toLowerCase();
   const keyword = filters.keyword.trim().toLowerCase();
 
   return rows.filter((row) => {
-    if (filters.problemType && row.problemType !== filters.problemType) {
-      return false;
-    }
-
     if (filters.questionTypeId && row.questionTypeId !== filters.questionTypeId) {
       return false;
     }
@@ -613,30 +565,19 @@ function filterRows(
       return false;
     }
 
-    if (filters.answerStatus === "filled" && !hasContent(row.answer)) {
+    if (filters.status === "missing_answer" && hasContent(row.answer)) {
       return false;
     }
 
-    if (filters.answerStatus === "missing" && hasContent(row.answer)) {
+    if (filters.status === "missing_analysis" && hasContent(row.analysis)) {
       return false;
     }
 
-    if (filters.analysisStatus === "filled" && !hasContent(row.analysis)) {
+    if (
+      filters.status === "completed" &&
+      (!hasContent(row.answer) || !hasContent(row.analysis))
+    ) {
       return false;
-    }
-
-    if (filters.analysisStatus === "missing" && hasContent(row.analysis)) {
-      return false;
-    }
-
-    if (submitterFilter) {
-      const submitterText = `${row.submitter?.full_name ?? ""} ${
-        row.submitter?.email ?? ""
-      } ${row.createdBy ?? ""}`.toLowerCase();
-
-      if (!submitterText.includes(submitterFilter)) {
-        return false;
-      }
     }
 
     if (keyword) {
