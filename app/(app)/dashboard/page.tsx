@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -16,9 +17,9 @@ import {
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { ExamCountdownCard } from "@/components/dashboard/ExamCountdownCard";
+import { canManageQuestionTypes, getCurrentUserRole } from "@/lib/roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { canManageQuestionTypes, getCurrentUserRole } from "@/lib/roles";
 import { getStudentDashboardData } from "@/services/student/dashboard";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ async function StudentDashboard({ userId }: { userId: string }) {
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <ExamCountdownCard />
 
-      <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <DashboardShortcut
           href="/mistakes/new"
           icon={PenLine}
@@ -89,7 +90,7 @@ async function StudentDashboard({ userId }: { userId: string }) {
             今日复盘状态
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
-            统计来自你的错题复习任务，帮助你看清今天进度、薄弱题型和最近复习走势。
+            只保留最能指导下一步学习的信息：今日任务、薄弱题型、知识点掌握度和最近 7 天学习总结。
           </p>
         </div>
 
@@ -190,74 +191,37 @@ async function StudentDashboard({ userId }: { userId: string }) {
         </DashboardPanel>
       </section>
 
-      <section className="mt-8 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+      <section className="mt-8">
         <DashboardPanel
           icon={Activity}
-          title="最近7天学习总结"
+          title="最近 7 天学习总结"
           description="汇总最近一周的录题、复习、专项训练和薄弱巩固完成情况。"
         >
           {hasSevenDaySummaryData(stats.sevenDaySummary) ? (
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StudySummaryCard
                 label="新增错题"
                 value={stats.sevenDaySummary.newMistakeCount}
-                helper="最近7天录入的错题"
+                helper="最近 7 天录入的错题"
               />
               <StudySummaryCard
                 label="完成复习"
                 value={stats.sevenDaySummary.completedReviewCount}
-                helper="最近7天完成的复习任务"
+                helper="最近 7 天完成的复习任务"
               />
               <StudySummaryCard
                 label="专项训练"
                 value={stats.sevenDaySummary.completedPracticeCount}
-                helper="最近7天完成的专项训练题"
+                helper="最近 7 天完成的专项训练题"
               />
               <StudySummaryCard
                 label="薄弱巩固"
                 value={stats.sevenDaySummary.completedWeakPracticeCount}
-                helper="最近7天完成的薄弱巩固题"
+                helper="最近 7 天完成的薄弱巩固题"
               />
             </div>
           ) : (
             <EmptyState text="最近还没有学习记录，完成复习或训练后这里会自动更新。" />
-          )}
-        </DashboardPanel>
-
-        <DashboardPanel
-          icon={ClipboardList}
-          title="最近复习记录"
-          description="最近完成的复习任务。"
-        >
-          {stats.recentReviews.length === 0 ? (
-            <EmptyState text="完成今日复习后，这里会显示最近记录。" />
-          ) : (
-            <div className="mt-5 space-y-3">
-              {stats.recentReviews.map((review) => (
-                <article
-                  key={review.id}
-                  className="rounded-md border border-ink/10 bg-paper px-3 py-3"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs text-ink/55">
-                      {review.questionType
-                        ? `${review.questionType.level1} / ${review.questionType.level2}`
-                        : "未确认题型"}
-                    </p>
-                    <span className="text-xs text-ink/45">
-                      {formatDateTime(review.completedAt)}
-                    </span>
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-sm leading-6 text-ink/75">
-                    {review.stem}
-                  </p>
-                  <p className="mt-2 text-xs text-ink/55">
-                    {getReviewRoundLabel(review.reviewRound)} ·{" "}
-                    {getResultLabel(review.result)}
-                  </p>
-                </article>
-              ))}
-            </div>
           )}
         </DashboardPanel>
       </section>
@@ -274,8 +238,7 @@ export async function TeacherDashboard() {
         <p className="text-sm font-medium text-clay">教师仪表盘</p>
         <h1 className="mt-1 text-2xl font-semibold text-ink">基础统计</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
-          汇总学生、题型库、待审核错题和近期复习完成情况。跨学生统计在服务端使用
-          service role 查询。
+          汇总学生、题型库、待审核错题和近期复习完成情况。跨学生统计在服务端使用 service role 查询。
         </p>
       </div>
 
@@ -438,7 +401,7 @@ function DashboardPanel({
   icon: LucideIcon;
   title: string;
   description: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <section className="rounded-md border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
@@ -516,14 +479,12 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
-function hasSevenDaySummaryData(
-  summary: {
-    newMistakeCount: number;
-    completedReviewCount: number;
-    completedPracticeCount: number;
-    completedWeakPracticeCount: number;
-  }
-) {
+function hasSevenDaySummaryData(summary: {
+  newMistakeCount: number;
+  completedReviewCount: number;
+  completedPracticeCount: number;
+  completedWeakPracticeCount: number;
+}) {
   return (
     summary.newMistakeCount > 0 ||
     summary.completedReviewCount > 0 ||
@@ -532,41 +493,6 @@ function hasSevenDaySummaryData(
   );
 }
 
-function getResultLabel(result: "mastered" | "not_mastered" | null) {
-  if (result === "mastered") {
-    return "已掌握";
-  }
-
-  if (result === "not_mastered") {
-    return "未掌握";
-  }
-
-  return "未记录";
-}
-
-function getReviewRoundLabel(reviewRound: string) {
-  const labels: Record<string, string> = {
-    day1: "第1天",
-    day3: "第3天",
-    day7: "第7天",
-    day14: "第14天",
-    day30: "第30天",
-    retry_day3: "补复习第3天",
-    retry_day7: "补复习第7天"
-  };
-
-  return labels[reviewRound] ?? reviewRound;
-}
-
 function formatPercent(value: number) {
   return `${Math.round(value)}%`;
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(new Date(value));
 }
