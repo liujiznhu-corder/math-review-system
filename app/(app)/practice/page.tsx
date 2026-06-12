@@ -36,7 +36,7 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl px-6 py-8">
+    <main className="mx-auto min-h-screen max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <PracticeHeader message={params?.message} />
       <PracticeStartForm
         questionTypes={options.questionTypes}
@@ -59,7 +59,7 @@ function PracticeHeader({ message }: { message?: string }) {
         </div>
         <Link
           href="/dashboard"
-          className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink sm:h-10 sm:w-auto"
         >
           <Home className="h-4 w-4" />
           返回首页

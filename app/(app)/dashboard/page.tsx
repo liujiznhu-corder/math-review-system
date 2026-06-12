@@ -46,7 +46,7 @@ async function StudentDashboard({ userId }: { userId: string }) {
   const stats = await getStudentDashboardData(userId);
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl px-6 py-8">
+    <main className="mx-auto min-h-screen max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <ExamCountdownCard />
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -414,7 +414,7 @@ function DashboardShortcut({
   return (
     <Link
       href={href}
-      className="rounded-md border border-ink/10 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-moss/40 hover:shadow-md"
+      className="rounded-md border border-ink/10 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-moss/40 hover:shadow-md sm:p-5"
     >
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-md bg-paper text-moss">
@@ -441,7 +441,7 @@ function DashboardPanel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-md border border-ink/10 bg-white p-5 shadow-sm">
+    <section className="rounded-md border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-moss/10 text-moss">
           <Icon className="h-5 w-5" />
@@ -468,7 +468,7 @@ function MetricCard({
   helper: string;
 }) {
   return (
-    <div className="rounded-md border border-ink/10 bg-white p-5 shadow-sm">
+    <div className="rounded-md border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-ink/60">{label}</p>
         <Icon className="h-5 w-5 text-moss" />

@@ -8,7 +8,7 @@ export function ExamCountdownCard() {
   const remainingDays = getRemainingDays();
 
   return (
-    <section className="rounded-md border border-ink/10 bg-white p-6 text-center shadow-sm sm:p-10">
+    <section className="rounded-md border border-ink/10 bg-white p-5 text-center shadow-sm sm:p-10">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-moss/10 text-moss">
         <CalendarDays className="h-6 w-6" />
       </div>
@@ -19,7 +19,7 @@ export function ExamCountdownCard() {
         江苏专转本数学考试倒计时
       </h1>
       <div className="mt-8 flex items-end justify-center gap-3">
-        <span className="text-7xl font-semibold leading-none text-ink sm:text-8xl">
+        <span className="text-6xl font-semibold leading-none text-ink sm:text-8xl">
           {remainingDays}
         </span>
         <span className="pb-2 text-xl font-medium text-ink/60">天</span>

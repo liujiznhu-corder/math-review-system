@@ -59,7 +59,7 @@ export default async function MistakeAnswerPage({
   } = answerData;
 
   return (
-    <main className="mx-auto min-h-screen max-w-4xl px-6 py-8">
+    <main className="mx-auto min-h-screen max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
       <ContextBackLink
         fallbackHref={canManage ? "/teacher/dashboard" : "/mistakes"}
         label={canManage ? "返回教师仪表盘" : "返回上一页"}
@@ -88,9 +88,9 @@ export default async function MistakeAnswerPage({
         </p>
       ) : null}
 
-      <section className="mt-6 rounded-md border border-ink/10 bg-white p-5 shadow-sm">
+      <section className="mt-6 rounded-md border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-lg font-semibold text-ink">题目</h2>
-        <div className="mt-4 rounded-md bg-paper p-4">
+        <div className="mt-4 max-w-full overflow-x-auto rounded-md bg-paper p-4">
           {mistake.input_type === "latex" ? (
             <LatexProblemRenderer
               rawLatex={mistake.raw_latex ?? mistake.latex_content}
@@ -103,7 +103,7 @@ export default async function MistakeAnswerPage({
         </div>
       </section>
 
-      <section className="mt-6 rounded-md border border-ink/10 bg-white p-5 shadow-sm">
+      <section className="mt-6 rounded-md border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-lg font-semibold text-ink">答案解析</h2>
 
         {!hasAnswerContent ? (
@@ -135,7 +135,7 @@ export default async function MistakeAnswerPage({
         <div className="mt-6">
           <Link
             href={`/teacher/solutions/${solution.id}`}
-            className="inline-flex h-10 items-center rounded-md bg-moss px-4 text-sm font-medium text-white"
+            className="inline-flex h-11 w-full items-center justify-center rounded-md bg-moss px-4 text-sm font-medium text-white sm:h-10 sm:w-auto"
           >
             去答案解析中心维护
           </Link>
@@ -147,7 +147,7 @@ export default async function MistakeAnswerPage({
 
 function AnswerBlock({ title, content }: { title: string; content: string }) {
   return (
-    <div className="rounded-md bg-paper p-4">
+    <div className="max-w-full overflow-x-auto rounded-md bg-paper p-4">
       <h3 className="text-sm font-semibold text-ink">{title}</h3>
       <div className="mt-2">
         <LatexContentRenderer content={content} />

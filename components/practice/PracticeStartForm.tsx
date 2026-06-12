@@ -20,7 +20,7 @@ export function PracticeStartForm({
   action
 }: PracticeStartFormProps) {
   return (
-    <form action={action} className="rounded-md border border-ink/10 bg-white p-5 shadow-sm">
+    <form action={action} className="rounded-md border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium text-clay">专项训练</p>
@@ -47,7 +47,7 @@ export function PracticeStartForm({
 
       <button
         type="submit"
-        className="mt-5 inline-flex h-10 items-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white"
+        className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white sm:h-10 sm:w-auto"
       >
         <PlayCircle className="h-4 w-4" />
         开始训练

@@ -41,7 +41,7 @@ export function LatexPreview({
 
   return (
     <div
-      className="max-w-none whitespace-pre-wrap break-words text-sm leading-7 text-ink/75"
+      className="max-w-full overflow-x-auto whitespace-pre-wrap break-words text-sm leading-7 text-ink/75 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

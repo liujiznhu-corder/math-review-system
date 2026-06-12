@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { CheckCircle2, Send, Save, Sparkles } from "lucide-react";
+import {
+  Bot,
+  CheckCircle2,
+  ClipboardCopy,
+  Send,
+  Save,
+  Sparkles,
+  X
+} from "lucide-react";
 import {
   recommendQuestionTypes,
   saveMistake,
@@ -9,30 +17,116 @@ import {
 } from "@/app/(app)/mistakes/actions";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import type { SelectableQuestionType } from "@/services/student/mistakes";
-import type { MistakeInputType } from "@/services/latex";
 
 type MistakeEntryFormProps = {
   message?: string;
   questionTypes: SelectableQuestionType[];
 };
 
+type PromptType = "single_choice" | "fill_blank" | "calculation";
+
+type PromptTemplate = {
+  type: PromptType;
+  label: string;
+  title: string;
+  description: string;
+  prompt: string;
+};
+
+const latexPlaceholder = String.raw`若函数$f(x)$在$x=1$处连续,且$\lim\limits_{x \to 1}\frac{f(x)}{x-1}=2,$则$\lim\limits_{x \to 0}\frac{f(1-2x)}{x}=$\blankbox
+\fourchoices
+{$-4$}{$-1$}{$1$}{$4$}`;
+
+const promptTemplates: PromptTemplate[] = [
+  {
+    type: "single_choice",
+    label: "单选题",
+    title: "单选题 LaTeX 转写提示词",
+    description: "适合包含 A/B/C/D 四个选项的选择题，输出可直接粘贴进本系统。",
+    prompt: String.raw`请将我提供的数学题图片或文字转换为可直接粘贴到系统中的 LaTeX 代码。
+
+要求：
+1. 只输出题目代码，不输出解释。
+2. 保留题干中的数学公式。
+3. 选择题空格统一使用 \blankbox。
+4. 四个选项必须使用：
+\fourchoices
+{选项A}{选项B}{选项C}{选项D}
+5. 选项内容如果是数学公式，请使用 $...$ 包裹。
+6. 不要输出答案。
+7. 不要输出解析。
+8. 不要使用 JSON。
+9. 不要使用 Markdown 代码块。
+
+输出格式示例：
+若函数$f(x)$在$x=1$处连续,且$\lim\limits_{x \to 1}\frac{f(x)}{x-1}=2,$则$\lim\limits_{x \to 0}\frac{f(1-2x)}{x}=$\blankbox
+\fourchoices
+{$-4$}{$-1$}{$1$}{$4$}`
+  },
+  {
+    type: "fill_blank",
+    label: "填空题",
+    title: "填空题 LaTeX 转写提示词",
+    description: "适合没有选项、需要填写一个或多个空的题目。",
+    prompt: String.raw`请将我提供的数学题图片或文字转换为可直接粘贴到系统中的 LaTeX 代码。
+
+要求：
+1. 只输出题目代码，不输出解释。
+2. 保留题干中的数学公式。
+3. 填空位置统一使用 \_\_\_。
+4. 不要输出答案。
+5. 不要输出解析。
+6. 不要使用 JSON。
+7. 不要使用 Markdown 代码块。
+
+输出格式示例：
+已知曲线$f(x)=\dfrac{e^x-1}{x-a}$有垂直渐近线$x=3$，则$a=$\_\_\_`
+  },
+  {
+    type: "calculation",
+    label: "计算题",
+    title: "计算题 LaTeX 转写提示词",
+    description: "适合极限、导数、积分、证明等需要完整保留条件的题目。",
+    prompt: String.raw`请将我提供的数学题图片或文字转换为可直接粘贴到系统中的 LaTeX 代码。
+
+要求：
+1. 只输出题目代码，不输出解释。
+2. 保留题干中的数学公式。
+3. 不要输出答案。
+4. 不要输出解析。
+5. 不要使用 JSON。
+6. 不要使用 Markdown 代码块。
+7. 如果题目是求极限、求导、积分、证明题，请完整保留题目条件。
+
+输出格式示例：
+求极限：
+$\lim\limits_{x \to 0}\dfrac{e^{x-\sin x}-1}{\arcsin x^3}$`
+  }
+];
+
 export function MistakeEntryForm({
   message,
   questionTypes
 }: MistakeEntryFormProps) {
-  const [inputType, setInputType] = useState<MistakeInputType>("plain_text");
-  const [rawText, setRawText] = useState("");
   const [latexContent, setLatexContent] = useState("");
   const [selectedQuestionTypeId, setSelectedQuestionTypeId] = useState("");
   const [recommendations, setRecommendations] = useState<
     RecommendedQuestionType[]
   >([]);
   const [errorMessage, setErrorMessage] = useState("");
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [selectedPromptType, setSelectedPromptType] =
+    useState<PromptType>("single_choice");
+  const [copyMessage, setCopyMessage] = useState("");
   const [isPending, startTransition] = useTransition();
 
+  const trimmedLatex = latexContent.trim();
+  const activeTemplate =
+    promptTemplates.find((template) => template.type === selectedPromptType) ??
+    promptTemplates[0];
   const canSave = useMemo(
-    () => getActiveInput(inputType, rawText, latexContent).length > 0 && selectedQuestionTypeId.length > 0,
-    [inputType, latexContent, rawText, selectedQuestionTypeId]
+    () => trimmedLatex.length > 0 && selectedQuestionTypeId.length > 0,
+    [selectedQuestionTypeId, trimmedLatex]
   );
 
   function handleRecommend() {
@@ -42,14 +136,15 @@ export function MistakeEntryForm({
     startTransition(async () => {
       try {
         const results = await recommendQuestionTypes({
-          inputType,
-          rawText,
+          inputType: "latex",
+          rawText: "",
           latexContent
         });
-          setRecommendations(results);
+
+        setRecommendations(results);
 
         if (results.length === 0) {
-          setErrorMessage("题型库为空或暂无可推荐题型，请先维护题型库。");
+          setErrorMessage("题型库为空或暂时没有可推荐题型，请先维护题型库。");
         }
       } catch (error) {
         setErrorMessage(
@@ -59,15 +154,31 @@ export function MistakeEntryForm({
     });
   }
 
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(activeTemplate.prompt);
+      setCopyMessage("提示词已复制，可以粘贴到豆包 / DeepSeek / ChatGPT。");
+    } catch {
+      setCopyMessage("复制失败，请手动选中提示词复制。");
+    }
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
-      <form action={saveMistake} className="rounded-md border border-ink/10 bg-white p-5 shadow-sm">
+      <form
+        action={saveMistake}
+        className="rounded-md border border-ink/10 bg-white p-4 shadow-sm sm:p-5"
+      >
         <input type="hidden" name="questionTypeId" value={selectedQuestionTypeId} />
-        <input type="hidden" name="inputType" value={inputType} />
+        <input type="hidden" name="inputType" value="latex" />
+        <input type="hidden" name="rawText" value="" />
+
         <div>
-          <h2 className="text-lg font-semibold text-ink">录入错题</h2>
+          <p className="text-sm font-medium text-clay">AI 录题助手模式</p>
+          <h2 className="mt-1 text-lg font-semibold text-ink">录入错题 LaTeX</h2>
           <p className="mt-2 text-sm leading-6 text-ink/65">
-            第一版不接 OCR。可粘贴普通文本，也可粘贴外部工具转写后的 LaTeX。
+            系统内暂不做 OCR。请先用外部 AI 工具把题目图片转成规定格式的
+            LaTeX，再粘贴到这里检查预览。
           </p>
         </div>
 
@@ -77,70 +188,51 @@ export function MistakeEntryForm({
           </p>
         ) : null}
 
-        <div className="mt-5">
-          <p className="text-sm font-medium text-ink">输入类型</p>
-          <div className="mt-2 inline-flex rounded-md border border-ink/15 bg-paper p-1">
+        <section className="mt-5 rounded-md border border-moss/15 bg-moss/5 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-ink">推荐流程</h3>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-6 text-ink/65">
+                <li>拍清楚题目图片</li>
+                <li>打开豆包 / DeepSeek / ChatGPT</li>
+                <li>复制本系统提供的提示词</li>
+                <li>让 AI 转成 LaTeX 代码</li>
+                <li>粘贴回本页面</li>
+                <li>检查预览无误后保存</li>
+              </ol>
+            </div>
             <button
               type="button"
-              onClick={() => setInputType("plain_text")}
-              className={`h-9 rounded px-3 text-sm font-medium ${
-                inputType === "plain_text"
-                  ? "bg-white text-ink shadow-sm"
-                  : "text-ink/60"
-              }`}
+              onClick={() => setAssistantOpen(true)}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white sm:w-auto"
             >
-              普通文本
-            </button>
-            <button
-              type="button"
-              onClick={() => setInputType("latex")}
-              className={`h-9 rounded px-3 text-sm font-medium ${
-                inputType === "latex"
-                  ? "bg-white text-ink shadow-sm"
-                  : "text-ink/60"
-              }`}
-            >
-              LaTeX
+              <Bot className="h-4 w-4" />
+              AI 录题助手
             </button>
           </div>
-        </div>
+        </section>
 
-        {inputType === "plain_text" ? (
-          <label className="mt-5 block text-sm font-medium text-ink">
-            题干
+        <div className="mt-5 grid gap-4">
+          <label className="block text-sm font-medium text-ink">
+            题目 LaTeX 代码
             <textarea
-              name="rawText"
-              required={inputType === "plain_text"}
-              rows={10}
-              value={rawText}
-              onChange={(event) => setRawText(event.target.value)}
-              placeholder="请手动输入错题题干。"
-              className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 text-sm leading-6 outline-none focus:border-moss"
+              name="latexContent"
+              required
+              rows={12}
+              value={latexContent}
+              onChange={(event) => setLatexContent(event.target.value)}
+              placeholder={latexPlaceholder}
+              className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 font-mono text-sm leading-6 outline-none focus:border-moss"
             />
           </label>
-        ) : (
-          <div className="mt-5 grid gap-4">
-            <label className="block text-sm font-medium text-ink">
-              LaTeX 题干
-              <textarea
-                name="latexContent"
-                required={inputType === "latex"}
-                rows={10}
-                value={latexContent}
-                onChange={(event) => setLatexContent(event.target.value)}
-                placeholder={"可粘贴如：求极限 $\\lim_{x\\to0}\\frac{\\sin x}{x}$。"}
-                className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 font-mono text-sm leading-6 outline-none focus:border-moss"
-              />
-            </label>
-            <div className="rounded-md border border-ink/10 bg-paper p-4">
-              <p className="mb-3 text-sm font-medium text-ink">实时预览</p>
-              <LatexProblemRenderer
-                rawLatex={latexContent}
-                fallback="输入 LaTeX 后显示预览"
-              />
-            </div>
+          <div className="max-w-full overflow-x-auto rounded-md border border-ink/10 bg-paper p-4">
+            <p className="mb-3 text-sm font-medium text-ink">实时预览</p>
+            <LatexProblemRenderer
+              rawLatex={latexContent}
+              fallback="输入 LaTeX 后显示预览"
+            />
           </div>
-        )}
+        </div>
 
         <label className="mt-4 block text-sm font-medium text-ink">
           最终题型
@@ -170,15 +262,12 @@ export function MistakeEntryForm({
           />
         </label>
 
-        <div className="mt-5 flex flex-wrap gap-3">
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <button
             type="button"
             onClick={handleRecommend}
-            disabled={
-              isPending ||
-              getActiveInput(inputType, rawText, latexContent).length === 0
-            }
-            className="inline-flex h-10 items-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-55"
+            disabled={isPending || trimmedLatex.length === 0}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-55 sm:h-10"
           >
             <Sparkles className="h-4 w-4" />
             {isPending ? "推荐中" : "智能推荐题型"}
@@ -188,7 +277,7 @@ export function MistakeEntryForm({
             name="intent"
             value="save"
             disabled={!canSave}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink disabled:cursor-not-allowed disabled:opacity-55"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink disabled:cursor-not-allowed disabled:opacity-55 sm:h-10"
           >
             <Save className="h-4 w-4" />
             保存错题
@@ -197,8 +286,8 @@ export function MistakeEntryForm({
             type="submit"
             name="intent"
             value="submit_review"
-            disabled={getActiveInput(inputType, rawText, latexContent).length === 0}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-clay/25 bg-clay/10 px-4 text-sm font-medium text-clay disabled:cursor-not-allowed disabled:opacity-55"
+            disabled={trimmedLatex.length === 0}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-clay/25 bg-clay/10 px-4 text-sm font-medium text-clay disabled:cursor-not-allowed disabled:opacity-55 sm:h-10"
           >
             <Send className="h-4 w-4" />
             提交教师审核
@@ -206,10 +295,10 @@ export function MistakeEntryForm({
         </div>
       </form>
 
-      <aside className="rounded-md border border-ink/10 bg-white p-5 shadow-sm">
+      <aside className="rounded-md border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-lg font-semibold text-ink">推荐题型</h2>
         <p className="mt-2 text-sm leading-6 text-ink/65">
-          推荐结果来自数据库题型库，通过关键词命中和例题文本相似度计算。
+          推荐结果来自数据库题型库，使用识别特征和代表例题相似度进行匹配。
         </p>
 
         {errorMessage ? (
@@ -221,7 +310,7 @@ export function MistakeEntryForm({
         <div className="mt-5 space-y-3">
           {recommendations.length === 0 && !errorMessage ? (
             <div className="rounded-md border border-dashed border-ink/20 bg-paper px-4 py-8 text-center text-sm text-ink/60">
-              点击智能推荐后显示最可能的 3 个题型。
+              粘贴 LaTeX 后点击智能推荐，系统会显示最可能的 3 个题型。
             </div>
           ) : null}
 
@@ -280,14 +369,116 @@ export function MistakeEntryForm({
           })}
         </div>
       </aside>
+
+      {assistantOpen ? (
+        <AiPromptAssistantModal
+          activeTemplate={activeTemplate}
+          selectedPromptType={selectedPromptType}
+          copyMessage={copyMessage}
+          onSelect={(type) => {
+            setSelectedPromptType(type);
+            setCopyMessage("");
+          }}
+          onCopy={copyPrompt}
+          onClose={() => {
+            setAssistantOpen(false);
+            setCopyMessage("");
+          }}
+        />
+      ) : null}
     </div>
   );
 }
 
-function getActiveInput(
-  inputType: MistakeInputType,
-  rawText: string,
-  latexContent: string
-) {
-  return inputType === "latex" ? latexContent.trim() : rawText.trim();
+function AiPromptAssistantModal({
+  activeTemplate,
+  selectedPromptType,
+  copyMessage,
+  onSelect,
+  onCopy,
+  onClose
+}: {
+  activeTemplate: PromptTemplate;
+  selectedPromptType: PromptType;
+  copyMessage: string;
+  onSelect: (type: PromptType) => void;
+  onCopy: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-ink/35 px-3 py-4 sm:items-center sm:justify-center">
+      <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-md bg-white p-4 shadow-xl sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-clay">AI 录题助手</p>
+            <h2 className="mt-1 text-xl font-semibold text-ink">
+              复制提示词到外部 AI 工具
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-ink/65">
+              本系统不上传图片、不调用 AI API。这里只提供统一格式提示词，帮助你把题目转成可预览、可分类的 LaTeX。
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-ink/15 bg-white text-ink"
+            aria-label="关闭 AI 录题助手"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 grid grid-cols-3 gap-2">
+          {promptTemplates.map((template) => (
+            <button
+              key={template.type}
+              type="button"
+              onClick={() => onSelect(template.type)}
+              className={`h-11 rounded-md border px-3 text-sm font-medium ${
+                selectedPromptType === template.type
+                  ? "border-moss bg-moss/10 text-moss"
+                  : "border-ink/10 bg-paper text-ink/65"
+              }`}
+            >
+              {template.label}
+            </button>
+          ))}
+        </div>
+
+        <section className="mt-5 rounded-md border border-ink/10 bg-paper p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-ink">
+                {activeTemplate.title}
+              </h3>
+              <p className="mt-1 text-sm leading-6 text-ink/60">
+                {activeTemplate.description}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onCopy}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white sm:w-auto"
+            >
+              <ClipboardCopy className="h-4 w-4" />
+              一键复制
+            </button>
+          </div>
+
+          {copyMessage ? (
+            <p className="mt-3 rounded-md border border-moss/20 bg-white px-3 py-2 text-sm text-moss">
+              {copyMessage}
+            </p>
+          ) : null}
+
+          <textarea
+            readOnly
+            value={activeTemplate.prompt}
+            rows={18}
+            className="mt-4 w-full rounded-md border border-ink/10 bg-white px-3 py-2 font-mono text-xs leading-6 text-ink/75 outline-none"
+          />
+        </section>
+      </div>
+    </div>
+  );
 }

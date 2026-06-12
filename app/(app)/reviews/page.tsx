@@ -23,7 +23,7 @@ export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
   ]);
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl px-6 py-8">
+    <main className="mx-auto min-h-screen max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium text-clay">今日复习</p>

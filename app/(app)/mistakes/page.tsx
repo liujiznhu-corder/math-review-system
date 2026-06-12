@@ -54,7 +54,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
     });
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl px-6 py-8">
+    <main className="mx-auto min-h-screen max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium text-clay">个人错题库</p>
@@ -65,7 +65,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
         </div>
         <Link
           href="/mistakes/new"
-          className="inline-flex h-10 items-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white sm:h-10 sm:w-auto"
         >
           <Plus className="h-4 w-4" />
           录入错题
@@ -121,7 +121,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
             />
           </label>
 
-          <div className="flex gap-3 lg:col-span-3">
+          <div className="flex flex-col gap-3 sm:flex-row lg:col-span-3">
             <button
               type="submit"
               className="inline-flex h-10 items-center justify-center rounded-md border border-ink/15 px-4 text-sm font-medium text-ink"
@@ -178,7 +178,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-md bg-paper p-4">
+                <div className="mt-4 max-w-full overflow-x-auto rounded-md bg-paper p-4">
                   {mistake.input_type === "latex" ? (
                     <LatexProblemRenderer
                       rawLatex={mistake.raw_latex ?? mistake.latex_content}
@@ -193,7 +193,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
                 <div className="mt-4">
                   <Link
                     href={`/mistakes/${mistake.id}/answer?returnUrl=${encodeURIComponent("/mistakes")}`}
-                    className="inline-flex h-9 items-center gap-2 rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink hover:border-moss/40 hover:text-moss"
+                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink hover:border-moss/40 hover:text-moss sm:h-9 sm:w-auto"
                   >
                     <Eye className="h-4 w-4" />
                     查看答案

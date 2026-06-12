@@ -26,7 +26,7 @@ export function LatexProblemRenderer({
   }
 
   return (
-    <div className="space-y-3 text-sm leading-7 text-ink/75">
+    <div className="max-w-full space-y-3 overflow-x-auto text-sm leading-7 text-ink/75">
       {parsed.parseError ? (
         <p className="rounded-md border border-clay/25 bg-clay/10 px-3 py-2 text-sm text-clay">
           {parsed.parseError}
@@ -48,7 +48,7 @@ function ChoiceList({ choices }: { choices: [string, string, string, string] }) 
       {choices.map((choice, index) => (
         <div
           key={`${labels[index]}-${choice}`}
-          className="flex items-start gap-2 rounded-md bg-white px-3 py-2"
+          className="min-w-0 overflow-x-auto rounded-md bg-white px-3 py-2 sm:flex sm:items-start sm:gap-2"
         >
           <span className="font-medium text-ink">{labels[index]}.</span>
           <LatexPreview content={choice} />

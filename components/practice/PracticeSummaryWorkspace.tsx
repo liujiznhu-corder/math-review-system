@@ -141,7 +141,7 @@ export function PracticeSummaryWorkspace({
 
   return (
     <div className="space-y-6">
-      <section className="rounded-md border border-ink/10 bg-white p-5 shadow-sm">
+      <section className="rounded-md border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm font-medium text-clay">训练完成</p>
@@ -152,7 +152,7 @@ export function PracticeSummaryWorkspace({
               完成时间：{formatDateTime(session.completedAt ?? new Date().toISOString())}
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
             <Metric label="总题数" value={session.records.length} />
             <Metric label="已掌握" value={masteredCount} />
             <Metric label="未掌握" value={notMasteredRecords.length} />
@@ -166,7 +166,7 @@ export function PracticeSummaryWorkspace({
         </p>
       ) : null}
 
-      <section className="rounded-md border border-ink/10 bg-white p-5 shadow-sm">
+      <section className="rounded-md border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-ink">未掌握题目</h2>
@@ -174,19 +174,19 @@ export function PracticeSummaryWorkspace({
               只把你想继续复盘的题加入错题库。
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button
               type="button"
               onClick={selectAll}
               disabled={selectableRecordIds.length === 0}
-              className="h-9 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
             >
               全选
             </button>
             <button
               type="button"
               onClick={clearSelected}
-              className="h-9 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink"
+              className="h-10 rounded-md border border-ink/15 bg-white px-3 text-sm text-ink sm:h-9"
             >
               取消全选
             </button>
@@ -194,7 +194,7 @@ export function PracticeSummaryWorkspace({
               type="button"
               onClick={addSelectedMistakes}
               disabled={isPending || selectedRecordIds.size === 0}
-              className="inline-flex h-9 items-center gap-2 rounded-md bg-clay px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-clay px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
             >
               <PlusCircle className="h-4 w-4" />
               加入选中的错题库
@@ -220,24 +220,24 @@ export function PracticeSummaryWorkspace({
         )}
       </section>
 
-      <section className="flex flex-wrap gap-3">
+      <section className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Link
           href="/practice"
-          className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink sm:h-10"
         >
           <RotateCcw className="h-4 w-4" />
           再练一次
         </Link>
         <Link
           href="/practice"
-          className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink sm:h-10"
         >
           <ArrowRight className="h-4 w-4" />
           返回专项训练
         </Link>
         <Link
           href="/dashboard"
-          className="inline-flex h-10 items-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white sm:h-10"
         >
           <Home className="h-4 w-4" />
           返回首页
@@ -298,7 +298,7 @@ function NotMasteredRecordItem({
           <span className="text-sm text-ink/50">可加入错题库</span>
         )}
       </div>
-      <div className="mt-3">
+      <div className="mt-3 max-w-full overflow-x-auto">
         {record.problem ? (
           <LatexProblemRenderer rawLatex={record.problem.displayLatex} />
         ) : (

@@ -31,7 +31,7 @@ export default async function WeakPracticePage({
   const data = await getTodayWeakPracticeData(user.id);
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl px-6 py-8">
+    <main className="mx-auto min-h-screen max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium text-clay">薄弱巩固</p>
@@ -44,7 +44,7 @@ export default async function WeakPracticePage({
         </div>
         <Link
           href="/dashboard"
-          className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink sm:h-10 sm:w-auto"
         >
           <Target className="h-4 w-4" />
           返回首页
