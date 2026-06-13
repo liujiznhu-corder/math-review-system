@@ -1,0 +1,43 @@
+{
+  "condition": {
+    "miniprogram": {
+      "list": [
+        {
+          "name": "pages/strengthen/index",
+          "pathName": "pages/strengthen/index",
+          "query": "",
+          "scene": null,
+          "launchMode": "default"
+        },
+        {
+          "name": "pages/review/index",
+          "pathName": "pages/review/index",
+          "query": "",
+          "launchMode": "default",
+          "scene": null
+        },
+        {
+          "name": "pages/practice/session/index",
+          "pathName": "pages/practice/session/index",
+          "query": "",
+          "launchMode": "default",
+          "scene": null
+        },
+        {
+          "name": "真实 LaTeX 样例",
+          "pathName": "pages/dev-latex-real/index",
+          "query": "",
+          "launchMode": "default",
+          "scene": null
+        },
+        {
+          "name": "LatexRenderer 测试",
+          "pathName": "pages/latex-poc/index",
+          "query": "",
+          "launchMode": "default",
+          "scene": null
+        }
+      ]
+    }
+  }
+}

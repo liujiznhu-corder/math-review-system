@@ -36,3 +36,35 @@
   line-height: 34px;
   color: #0f4f3f;
 }
+
+.latex-poc-filters {
+  display: flex;
+  margin-bottom: 20px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.latex-poc-filter {
+  padding: 8px 16px;
+  border: 1px solid #d8e8df;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #4b635b;
+  font-size: 22px;
+  line-height: 30px;
+}
+
+.latex-poc-filter-active {
+  border-color: #0f4f3f;
+  background: #0f4f3f;
+  color: #ffffff;
+}
+
+.latex-poc-count {
+  display: block;
+  margin-bottom: 18px;
+  color: #6b7280;
+  font-size: 22px;
+  line-height: 30px;
+}

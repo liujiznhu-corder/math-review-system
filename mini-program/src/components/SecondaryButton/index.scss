@@ -1,0 +1,26 @@
+@import "../../styles/variables.scss";
+
+.secondary-button {
+  display: flex;
+  min-height: 88px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid $color-primary;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.secondary-button-text {
+  color: $color-primary;
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 700;
+}
+
+.secondary-button-warning {
+  border-color: $color-warning;
+}
+
+.secondary-button-warning .secondary-button-text {
+  color: $color-warning;
+}

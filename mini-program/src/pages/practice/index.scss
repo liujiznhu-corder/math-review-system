@@ -1,0 +1,89 @@
+@import "../../styles/variables.scss";
+
+.practice-page {
+  padding-bottom: 150px;
+}
+
+.practice-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.practice-subject {
+  font-size: 36px;
+  line-height: 46px;
+  font-weight: 800;
+  color: $color-text;
+}
+
+.practice-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.practice-category-card {
+  padding: 24px;
+}
+
+.practice-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.practice-category-title {
+  font-size: 30px;
+  line-height: 40px;
+  font-weight: 700;
+  color: $color-text;
+}
+
+.practice-category-arrow {
+  font-size: 30px;
+  line-height: 38px;
+  color: $color-primary;
+}
+
+.practice-type-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.practice-type-card {
+  padding: 22px;
+  border: 2px solid $color-border;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.practice-type-card-selected {
+  border-color: $color-primary;
+  background: $color-primary-soft;
+}
+
+.practice-type-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.practice-type-name {
+  font-size: 28px;
+  line-height: 38px;
+  font-weight: 700;
+  color: $color-text;
+}
+
+.practice-type-count {
+  display: block;
+  margin-bottom: 16px;
+  font-size: 22px;
+  line-height: 30px;
+  color: $color-muted;
+}

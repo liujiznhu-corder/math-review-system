@@ -1,0 +1,37 @@
+@import "../../styles/variables.scss";
+
+.status-tag {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+.status-tag-primary {
+  color: $color-primary;
+  background: $color-primary-soft;
+}
+
+.status-tag-success {
+  color: $color-success;
+  background: #e7f7ef;
+}
+
+.status-tag-warning {
+  color: $color-warning;
+  background: #fff1ec;
+}
+
+.status-tag-muted {
+  color: $color-muted;
+  background: #f0f2f1;
+}
+
+.status-tag-blue {
+  color: #3159a6;
+  background: $color-blue-soft;
+}

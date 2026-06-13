@@ -1,0 +1,258 @@
+.dev-latex-page {
+  min-height: 100vh;
+  padding: 32px 24px 48px;
+  background: #f7f4ee;
+  box-sizing: border-box;
+}
+
+.dev-latex-header {
+  margin-bottom: 24px;
+}
+
+.dev-latex-title {
+  display: block;
+  color: #0f4f3f;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 44px;
+}
+
+.dev-latex-subtitle {
+  display: block;
+  margin-top: 8px;
+  color: #6b7280;
+  font-size: 24px;
+  line-height: 34px;
+}
+
+.dev-latex-filter-scroll {
+  width: 100%;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+.dev-latex-filters {
+  display: flex;
+  min-width: max-content;
+  flex-direction: row;
+  gap: 12px;
+}
+
+.dev-latex-filter {
+  padding: 8px 16px;
+  border: 1px solid #d8e8df;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #4b635b;
+  font-size: 22px;
+  line-height: 30px;
+}
+
+.dev-latex-filter-active {
+  border-color: #0f4f3f;
+  background: #0f4f3f;
+  color: #ffffff;
+}
+
+.dev-latex-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.dev-latex-list,
+.dev-latex-detail-card {
+  border: 1px solid #e8e2d8;
+  border-radius: 16px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.dev-latex-list {
+  padding: 18px;
+}
+
+.dev-latex-section-title {
+  display: block;
+  margin-bottom: 14px;
+  color: #6b7280;
+  font-size: 22px;
+  line-height: 30px;
+}
+
+.dev-latex-list-item {
+  padding: 16px 0;
+  border-top: 1px solid #f0ece4;
+}
+
+.dev-latex-list-item-active {
+  padding-right: 12px;
+  padding-left: 12px;
+  border-radius: 12px;
+  background: #f1f8f5;
+}
+
+.dev-latex-list-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dev-latex-list-title {
+  color: #111827;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 36px;
+}
+
+.dev-latex-list-badge {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eaf6f1;
+  color: #0f4f3f;
+  font-size: 20px;
+  line-height: 28px;
+}
+
+.dev-latex-list-meta {
+  display: block;
+  margin: 6px 0 8px;
+  color: #6b7280;
+  font-size: 22px;
+  line-height: 30px;
+}
+
+.dev-latex-detail-card {
+  padding: 22px;
+}
+
+.dev-latex-detail-title {
+  display: block;
+  color: #111827;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 42px;
+}
+
+.dev-latex-detail-meta,
+.dev-latex-notes {
+  display: block;
+  margin-top: 8px;
+  color: #6b7280;
+  font-size: 23px;
+  line-height: 34px;
+}
+
+.dev-latex-notes {
+  color: #0f6a50;
+}
+
+.dev-latex-block {
+  margin-top: 22px;
+}
+
+.dev-latex-block-title {
+  display: block;
+  margin-bottom: 10px;
+  color: #374151;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 34px;
+}
+
+.dev-latex-tags {
+  display: flex;
+  margin-top: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dev-latex-tag {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #f5f1e8;
+  color: #6b5f4d;
+  font-size: 20px;
+  line-height: 28px;
+}
+
+.dev-latex-debug {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px dashed #c7d8d0;
+  border-radius: 12px;
+  background: #fbfdfb;
+}
+
+.dev-latex-debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.dev-latex-debug-title {
+  color: #0f4f3f;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 30px;
+}
+
+.dev-latex-debug-status {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 18px;
+  line-height: 26px;
+}
+
+.dev-latex-debug-success {
+  background: #eaf6f1;
+  color: #0f6a50;
+}
+
+.dev-latex-debug-fallback {
+  background: #fff7e6;
+  color: #9a5b00;
+}
+
+.dev-latex-debug-error {
+  background: #fff1ec;
+  color: #a43b1b;
+}
+
+.dev-latex-debug-row {
+  margin-top: 10px;
+}
+
+.dev-latex-debug-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #6b7280;
+  font-size: 19px;
+  line-height: 26px;
+}
+
+.dev-latex-debug-scroll {
+  width: 100%;
+  border-radius: 8px;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.dev-latex-debug-inner {
+  min-width: max-content;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.dev-latex-debug-text {
+  color: #374151;
+  font-family: Menlo, Consolas, monospace;
+  font-size: 18px;
+  line-height: 28px;
+  white-space: pre;
+}

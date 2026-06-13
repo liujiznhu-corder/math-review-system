@@ -7,32 +7,48 @@
   box-sizing: border-box;
 }
 
+.latex-full-render {
+  width: 100%;
+}
+
 .latex-card-header {
   display: flex;
-  justify-content: space-between;
   gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
   margin-bottom: 20px;
+}
+
+.latex-card-heading {
+  min-width: 0;
 }
 
 .latex-card-title {
   display: block;
-  font-size: 30px;
-  line-height: 40px;
-  font-weight: 700;
   color: #111827;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 40px;
 }
 
 .latex-card-description {
   display: block;
   margin-top: 4px;
+  color: #6b7280;
   font-size: 22px;
   line-height: 32px;
-  color: #6b7280;
+}
+
+.latex-card-category {
+  display: block;
+  margin-top: 8px;
+  color: #0f6a50;
+  font-size: 20px;
+  line-height: 28px;
 }
 
 .latex-status {
   flex-shrink: 0;
-  align-self: flex-start;
   padding: 6px 12px;
   border-radius: 999px;
   font-size: 20px;
@@ -44,7 +60,7 @@
   background: #eaf6f1;
 }
 
-.latex-status-fail {
+.latex-status-fallback {
   color: #a43b1b;
   background: #fff1ec;
 }
@@ -56,144 +72,212 @@
 .latex-section-title {
   display: block;
   margin-bottom: 10px;
+  color: #6b7280;
   font-size: 22px;
   line-height: 30px;
-  color: #6b7280;
 }
 
 .latex-raw-scroll,
-.latex-render-scroll {
+.latex-fallback-scroll {
   width: 100%;
   box-sizing: border-box;
 }
 
+.latex-display-scroll {
+  box-sizing: border-box;
+}
+
 .latex-raw-scroll {
-  padding: 16px;
   border-radius: 12px;
   background: #f8fafc;
 }
 
-.latex-render-scroll {
-  padding: 18px;
-  border: 1px solid #e8e2d8;
-  border-radius: 12px;
-  background: #fffdf9;
+.latex-raw-inner,
+.latex-display-inner,
+.latex-fallback-inner {
+  box-sizing: border-box;
 }
 
-.latex-raw-text {
+.latex-raw-inner,
+.latex-fallback-inner {
+  min-width: max-content;
+  padding: 16px;
+}
+
+.latex-raw-text,
+.latex-fallback-text {
+  color: #111827;
   font-family: Menlo, Consolas, monospace;
   font-size: 22px;
   line-height: 34px;
   white-space: pre;
-  color: #111827;
 }
 
-.latex-direct-result {
+.latex-render-box {
   display: flex;
-  align-items: center;
-  min-width: max-content;
-  font-size: 30px;
-  line-height: 48px;
-  white-space: nowrap;
+  min-height: 96px;
+  padding: 18px;
+  border: 1px solid #e8e2d8;
+  border-radius: 12px;
+  background: #fffdf9;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
 }
 
-.latex-inline-text {
-  font-size: 30px;
-  line-height: 48px;
+.latex-inline-flow {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8rpx;
+  row-gap: 8rpx;
+}
+
+.latex-plain-text {
+  display: inline;
   color: #111827;
+  font-size: 28px;
+  line-height: 48px;
+  white-space: pre-wrap;
+}
+
+.latex-preview-text {
+  display: block;
+  color: #374151;
+  font-size: 24px;
+  line-height: 34px;
+}
+
+.latex-display-scroll {
+  max-width: 100%;
+  flex: 0 1 auto;
+}
+
+.latex-flow-math-scroll {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.latex-display-inner {
+  display: inline-block;
+  min-width: max-content;
+  padding: 0 2px;
+  vertical-align: middle;
+}
+
+.latex-inline-math {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: baseline;
+  line-height: 1;
+  vertical-align: baseline;
+}
+
+.latex-rich-text {
+  display: inline-block;
+  min-width: max-content;
+  color: #111827;
+  vertical-align: middle;
 }
 
 .latex-blankbox {
-  display: inline-block;
-  width: 72px;
-  height: 32px;
-  margin: 0 8px;
-  border: 2px solid #0f4f3f;
-  border-radius: 6px;
-  vertical-align: middle;
-}
-
-.latex-underline {
-  display: inline-block;
-  width: 112px;
-  margin: 0 8px;
-  border-bottom: 2px solid #111827;
-  vertical-align: middle;
-}
-
-.latex-sqrt {
-  display: inline-block;
-  margin: 0 4px;
-  font-size: 30px;
-  line-height: 48px;
-}
-
-.latex-frac {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 36px;
-  margin: 0 6px;
-  vertical-align: middle;
-}
-
-.latex-frac-part {
-  display: block;
-  padding: 0 6px;
-  font-size: 24px;
-  line-height: 28px;
-}
-
-.latex-frac-line {
-  width: 100%;
-  height: 2px;
-  margin: 2px 0;
-  background: #111827;
+  width: 96rpx;
+  min-width: 96rpx;
+  height: 1em;
+  margin: 0 8rpx;
+  border-bottom: 2rpx solid #86a89d;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  line-height: 1;
+  vertical-align: baseline;
+  transform: translateY(2rpx);
 }
 
 .latex-choices {
   display: flex;
+  width: 100%;
+  margin-top: 14px;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 16px;
-  min-width: 620px;
+  gap: 12px;
 }
 
 .latex-choice-row {
   display: flex;
-  gap: 10px;
-  padding: 12px 14px;
+  width: 100%;
+  min-width: 0;
+  padding: 14px 16px;
   border: 1px solid #e8e2d8;
   border-radius: 12px;
   background: #ffffff;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 12px;
 }
 
 .latex-choice-label {
-  width: 36px;
+  display: flex;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: #eaf6f1;
   color: #0f4f3f;
-  font-size: 26px;
-  line-height: 36px;
+  font-size: 24px;
   font-weight: 700;
+  line-height: 40px;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.latex-choice-text {
-  font-size: 26px;
-  line-height: 36px;
-  color: #111827;
+.latex-choice-content {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 8px;
 }
 
-.latex-fallback {
-  padding: 16px;
+.latex-block-fallback {
   border: 1px solid #f1b9a8;
   border-radius: 12px;
   background: #fff7f4;
 }
 
+.latex-block-fallback {
+  width: 100%;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.latex-inline-fallback-text {
+  display: inline;
+  color: #a43b1b;
+  font-size: 26px;
+  line-height: 44px;
+}
+
 .latex-fallback-label {
   display: block;
   margin-bottom: 10px;
+  color: #a43b1b;
   font-size: 22px;
   line-height: 30px;
-  color: #a43b1b;
+}
+
+.latex-acceptance-text {
+  display: block;
+  padding: 16px;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #374151;
+  font-size: 24px;
+  line-height: 36px;
+  white-space: pre-wrap;
 }

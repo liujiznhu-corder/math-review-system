@@ -87,6 +87,27 @@
   color: $color-muted;
 }
 
+.practice-status-card {
+  min-height: 150px;
+  padding: 24px;
+}
+
+.practice-status-label {
+  display: block;
+  font-size: 22px;
+  line-height: 30px;
+  color: $color-muted;
+}
+
+.practice-status-value {
+  display: block;
+  margin-top: 16px;
+  font-size: 38px;
+  line-height: 46px;
+  font-weight: 800;
+  color: $color-primary;
+}
+
 .review-card {
   display: flex;
   align-items: center;

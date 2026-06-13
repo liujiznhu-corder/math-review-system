@@ -1,5 +1,5 @@
 {
-  "appid": "touristappid",
+  "appid": "wx36633bdee1ce9153",
   "projectname": "jiangsu-math-review-mini-program",
   "description": "江苏专转本数学错题复盘系统微信小程序",
   "miniprogramRoot": "dist/",
@@ -9,8 +9,32 @@
     "enhance": true,
     "postcss": true,
     "minified": true,
-    "compileHotReLoad": false
+    "compileHotReLoad": false,
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
   },
   "compileType": "miniprogram",
-  "libVersion": "latest"
+  "libVersion": "latest",
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "editorSetting": {}
 }

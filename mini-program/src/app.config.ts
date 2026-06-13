@@ -5,7 +5,11 @@ export default defineAppConfig({
     "pages/strengthen/index",
     "pages/mistake/index",
     "pages/profile/index",
-    "pages/latex-poc/index"
+    "pages/practice/index",
+    "pages/practice/session/index",
+    "pages/practice/summary/index",
+    "pages/latex-poc/index",
+    "pages/dev-latex-real/index"
   ],
   window: {
     backgroundTextStyle: "light",

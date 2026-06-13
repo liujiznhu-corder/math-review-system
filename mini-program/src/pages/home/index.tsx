@@ -1,3 +1,4 @@
+import Taro from "@tarojs/taro";
 import { Text, View } from "@tarojs/components";
 import { BrandHeader } from "../../components/BrandHeader";
 import { Card } from "../../components/Card";
@@ -6,9 +7,19 @@ import "./index.scss";
 
 const quickActions = [
   { title: "录入错题", hint: "粘贴 LaTeX" },
-  { title: "今日复习", hint: "按期巩固" },
-  { title: "薄弱巩固", hint: "每日 5 题" },
-  { title: "专项训练", hint: "按题型练" }
+  {
+    title: "今日复习",
+    hint: "按期巩固",
+    url: "/pages/review/index",
+    tab: true
+  },
+  {
+    title: "薄弱巩固",
+    hint: "每日 5 题",
+    url: "/pages/strengthen/index",
+    tab: true
+  },
+  { title: "专项训练", hint: "按题型练", url: "/pages/practice/index" }
 ];
 
 const weakPoints = [
@@ -27,6 +38,20 @@ const sevenDayStats = [
 ];
 
 export default function HomePage() {
+  const openQuickAction = (url?: string, tab?: boolean) => {
+    if (!url) {
+      Taro.showToast({ title: "后续阶段开放", icon: "none" });
+      return;
+    }
+
+    if (tab) {
+      Taro.switchTab({ url });
+      return;
+    }
+
+    Taro.navigateTo({ url });
+  };
+
   return (
     <View className="page-shell home-page">
       <View className="page-stack">
@@ -47,7 +72,11 @@ export default function HomePage() {
 
         <View className="quick-grid">
           {quickActions.map((item) => (
-            <Card key={item.title} className="quick-card">
+            <Card
+              key={item.title}
+              className="quick-card"
+              onClick={() => openQuickAction(item.url, item.tab)}
+            >
               <Text className="quick-title">{item.title}</Text>
               <Text className="quick-hint">{item.hint}</Text>
             </Card>
@@ -69,7 +98,13 @@ export default function HomePage() {
 
         <View className="status-grid">
           <MetricCard label="薄弱巩固 · 需关注" value={5} tone="warning" />
-          <MetricCard label="专项训练 · 未开始" value="-" tone="primary" />
+          <Card
+            className="practice-status-card"
+            onClick={() => Taro.navigateTo({ url: "/pages/practice/index" })}
+          >
+            <Text className="practice-status-label">专项训练 · 未开始</Text>
+            <Text className="practice-status-value">开始</Text>
+          </Card>
         </View>
 
         <View>

@@ -1,21 +1,32 @@
 @import "../../styles/variables.scss";
 
-.placeholder-card {
-  padding: 28px;
+.strengthen-practice-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px 26px;
 }
 
-.placeholder-title {
+.strengthen-practice-title {
   display: block;
-  font-size: 32px;
-  line-height: 42px;
-  font-weight: 700;
+  font-size: 28px;
+  line-height: 38px;
+  font-weight: 800;
   color: $color-primary;
 }
 
-.placeholder-copy {
+.strengthen-practice-copy {
   display: block;
-  margin-top: 12px;
-  font-size: 24px;
-  line-height: 36px;
+  margin-top: 6px;
+  font-size: 23px;
+  line-height: 32px;
   color: $color-muted;
+}
+
+.strengthen-practice-arrow {
+  flex-shrink: 0;
+  font-size: 42px;
+  line-height: 42px;
+  color: $color-primary;
 }

@@ -1,0 +1,28 @@
+@import "../../styles/variables.scss";
+
+.app-top-bar {
+  display: grid;
+  grid-template-columns: 72px 1fr 92px;
+  align-items: center;
+  min-height: 64px;
+}
+
+.app-top-bar-title {
+  text-align: center;
+  font-size: 32px;
+  line-height: 42px;
+  font-weight: 700;
+  color: $color-text;
+}
+
+.app-top-bar-side {
+  font-size: 36px;
+  line-height: 44px;
+  color: $color-primary;
+}
+
+.app-top-bar-right {
+  text-align: right;
+  font-size: 24px;
+  line-height: 34px;
+}
