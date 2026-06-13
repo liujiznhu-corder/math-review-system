@@ -1,0 +1,16 @@
+{
+  "appid": "touristappid",
+  "projectname": "jiangsu-math-review-mini-program",
+  "description": "江苏专转本数学错题复盘系统微信小程序",
+  "miniprogramRoot": "dist/",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "compileHotReLoad": false
+  },
+  "compileType": "miniprogram",
+  "libVersion": "latest"
+}

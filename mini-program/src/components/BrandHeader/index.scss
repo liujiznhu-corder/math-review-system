@@ -1,0 +1,32 @@
+@import "../../styles/variables.scss";
+
+.brand-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-mark {
+  display: flex;
+  width: 52px;
+  height: 52px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: $color-primary;
+}
+
+.brand-mark-text {
+  color: #ffffff;
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 700;
+}
+
+.brand-title {
+  flex: 1;
+  font-size: 30px;
+  line-height: 40px;
+  font-weight: 700;
+  color: $color-primary;
+}

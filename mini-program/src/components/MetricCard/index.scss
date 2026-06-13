@@ -1,0 +1,44 @@
+@import "../../styles/variables.scss";
+
+.metric-card {
+  display: flex;
+  min-height: 130px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 22px;
+  border: 1px solid $color-border;
+  border-radius: 16px;
+  background: $color-card;
+}
+
+.metric-card-value {
+  font-size: 38px;
+  line-height: 46px;
+  font-weight: 800;
+  color: $color-text;
+}
+
+.metric-card-label {
+  font-size: 22px;
+  line-height: 30px;
+  color: $color-muted;
+}
+
+.metric-card-primary {
+  border-color: #cfe8dc;
+  background: $color-primary-soft;
+}
+
+.metric-card-primary .metric-card-value {
+  color: $color-primary;
+}
+
+.metric-card-warning {
+  border-color: #f3d0c3;
+  background: #fff7f4;
+}
+
+.metric-card-warning .metric-card-value {
+  color: $color-warning;
+}

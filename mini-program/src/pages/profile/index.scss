@@ -1,0 +1,21 @@
+@import "../../styles/variables.scss";
+
+.placeholder-card {
+  padding: 28px;
+}
+
+.placeholder-title {
+  display: block;
+  font-size: 32px;
+  line-height: 42px;
+  font-weight: 700;
+  color: $color-primary;
+}
+
+.placeholder-copy {
+  display: block;
+  margin-top: 12px;
+  font-size: 24px;
+  line-height: 36px;
+  color: $color-muted;
+}

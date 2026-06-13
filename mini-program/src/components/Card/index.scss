@@ -1,0 +1,8 @@
+@import "../../styles/variables.scss";
+
+.app-card {
+  border: 1px solid $color-border;
+  border-radius: $radius-card;
+  background: $color-card;
+  box-shadow: 0 10px 24px rgba(15, 79, 63, 0.05);
+}

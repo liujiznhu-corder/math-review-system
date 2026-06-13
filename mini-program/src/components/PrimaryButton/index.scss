@@ -1,0 +1,21 @@
+@import "../../styles/variables.scss";
+
+.primary-button {
+  display: flex;
+  min-height: 88px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: $color-primary;
+}
+
+.primary-button-text {
+  color: #ffffff;
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 700;
+}
+
+.primary-button-disabled {
+  background: #b9cfc6;
+}
