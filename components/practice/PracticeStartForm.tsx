@@ -1,6 +1,7 @@
 "use client";
 
-import { PlayCircle } from "lucide-react";
+import { useFormStatus } from "react-dom";
+import { LoaderCircle, PlayCircle } from "lucide-react";
 import {
   CascadingQuestionTypeFilters,
   type CascadingQuestionTypeOption
@@ -45,14 +46,27 @@ export function PracticeStartForm({
 
       <QuestionTypeCounts questionTypes={questionTypes} />
 
-      <button
-        type="submit"
-        className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white sm:h-10 sm:w-auto"
-      >
-        <PlayCircle className="h-4 w-4" />
-        开始训练
-      </button>
+      <StartButton />
     </form>
+  );
+}
+
+function StartButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 sm:h-10 sm:w-auto"
+    >
+      {pending ? (
+        <LoaderCircle className="h-4 w-4 animate-spin" />
+      ) : (
+        <PlayCircle className="h-4 w-4" />
+      )}
+      {pending ? "创建中" : "开始训练"}
+    </button>
   );
 }
 

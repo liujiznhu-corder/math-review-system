@@ -4,6 +4,7 @@ import type { StudentApiErrorCode } from "@/app/api/student/_utils";
 import type { Database } from "@/types/database";
 
 const PRACTICE_QUESTION_COUNT = 5;
+const PRACTICE_QUESTION_TYPE_LIMIT = 500;
 
 type PracticeResult =
   Database["public"]["Tables"]["practice_records"]["Row"]["result"];
@@ -35,8 +36,15 @@ export type PracticeRecordView = {
     displayLatex: string;
     answer: string | null;
     analysis: string | null;
+    solutionLoaded: boolean;
     questionType: PracticeQuestionType | null;
   } | null;
+};
+
+export type PracticeRecordSolutionView = {
+  recordId: string;
+  answer: string | null;
+  analysis: string | null;
 };
 
 export type PracticeSessionView = {
@@ -63,9 +71,13 @@ type ProblemRow = {
   question_type_id: string | null;
   problem_type: ProblemType;
   raw_latex: string;
-  answer: string | null;
-  analysis: string | null;
+  answer?: string | null;
+  analysis?: string | null;
   question_types: QuestionTypeRow | QuestionTypeRow[] | null;
+};
+
+type PracticeQuestionTypeWithCountRow = QuestionTypeRow & {
+  problems?: { count: number }[] | { count: number } | null;
 };
 
 type PracticeSessionRow = {
@@ -93,11 +105,6 @@ type CandidateProblem = {
   id: string;
   questionTypeId: string;
   problemType: ProblemType;
-  rawLatex: string;
-  answer: string | null;
-  analysis: string | null;
-  questionType: QuestionTypeRow | null;
-  hasSolution: boolean;
 };
 
 type AddMistakesResult = {
@@ -130,20 +137,23 @@ export class StudentPracticeError extends Error {
 
 export async function getPracticeOptions() {
   const supabase = await createClient();
-  const [{ data: questionTypes, error: questionTypesError }, { data, error }] =
-    await Promise.all([
+  const timingId = createTimingId("practice-options");
+  console.time(`${timingId}:total`);
+
+  const { data: questionTypes, error: questionTypesError } = await withTiming(
+    `${timingId}:question-types`,
+    () =>
       supabase
         .from("question_types")
-        .select("id, level1, level2, level3")
+        .select("id, level1, level2, level3, problems(count)")
         .eq("is_active", true)
         .order("level1", { ascending: true })
         .order("level2", { ascending: true })
-        .order("level3", { ascending: true }),
-      supabase
-        .from("problems")
-        .select("id, question_type_id")
-        .not("question_type_id", "is", null)
-    ]);
+        .order("level3", { ascending: true })
+        .limit(PRACTICE_QUESTION_TYPE_LIMIT)
+  );
+
+  console.timeEnd(`${timingId}:total`);
 
   if (questionTypesError) {
     throw new StudentPracticeError(
@@ -153,31 +163,13 @@ export async function getPracticeOptions() {
     );
   }
 
-  if (error) {
-    throw new StudentPracticeError(
-      "SERVER_ERROR",
-      `读取教师题库失败：${error.message}`,
-      500
-    );
-  }
-
-  const countMap = new Map<string, number>();
-
-  for (const problem of (data ?? []) as Array<{ question_type_id: string | null }>) {
-    if (!problem.question_type_id) {
-      continue;
-    }
-
-    countMap.set(
-      problem.question_type_id,
-      (countMap.get(problem.question_type_id) ?? 0) + 1
-    );
-  }
-
   return {
-    questionTypes: ((questionTypes ?? []) as QuestionTypeRow[]).map((item) => ({
-      ...item,
-      availableProblemCount: countMap.get(item.id) ?? 0
+    questionTypes: ((questionTypes ?? []) as PracticeQuestionTypeWithCountRow[]).map((item) => ({
+      id: item.id,
+      level1: item.level1,
+      level2: item.level2,
+      level3: item.level3,
+      availableProblemCount: getEmbeddedProblemCount(item.problems)
     })),
     questionCount: PRACTICE_QUESTION_COUNT
   };
@@ -198,11 +190,17 @@ export async function createPracticeSession({
   }
 
   const supabase = await createClient();
-  const selectedQuestionType = await getQuestionTypeOrThrow(questionTypeId);
-  const selectedProblems = await selectPracticeProblems({
-    selectedQuestionType,
-    targetCount: PRACTICE_QUESTION_COUNT
-  });
+  const timingId = createTimingId("practice-create");
+  console.time(`${timingId}:total`);
+  const selectedQuestionType = await withTiming(`${timingId}:question-type`, () =>
+    getQuestionTypeOrThrow(questionTypeId)
+  );
+  const selectedProblems = await withTiming(`${timingId}:practice-problems`, () =>
+    selectPracticeProblems({
+      selectedQuestionType,
+      targetCount: PRACTICE_QUESTION_COUNT
+    })
+  );
 
   if (selectedProblems.length < PRACTICE_QUESTION_COUNT) {
     throw new StudentPracticeError(
@@ -249,19 +247,43 @@ export async function createPracticeSession({
     );
   }
 
-  return getPracticeSession(userId, session.id);
+  const practiceSession = await getPracticeSession(userId, session.id);
+  console.timeEnd(`${timingId}:total`);
+
+  return practiceSession;
 }
 
 export async function getPracticeSession(userId: string, sessionId: string) {
   const supabase = await createClient();
-  const { data: session, error: sessionError } = await supabase
-    .from("practice_sessions")
-    .select(
-      "id, question_type_id, question_count, status, started_at, completed_at, question_types(id, level1, level2, level3)"
+  const timingId = createTimingId("practice-session");
+  console.time(`${timingId}:total`);
+  const [
+    { data: session, error: sessionError },
+    { data: records, error: recordsError }
+  ] = await Promise.all([
+    withTiming(`${timingId}:stats`, () =>
+      supabase
+        .from("practice_sessions")
+        .select(
+          "id, question_type_id, question_count, status, started_at, completed_at, question_types(id, level1, level2, level3)"
+        )
+        .eq("id", sessionId)
+        .eq("user_id", userId)
+        .maybeSingle()
+    ),
+    withTiming(`${timingId}:practice-problems`, () =>
+      supabase
+        .from("practice_records")
+        .select(
+          "id, position, status, result, answered_at, added_to_mistakes_at, created_mistake_id, problems(id, question_type_id, problem_type, raw_latex, question_types(id, level1, level2, level3))"
+        )
+        .eq("session_id", sessionId)
+        .eq("user_id", userId)
+        .order("position", { ascending: true })
+        .limit(PRACTICE_QUESTION_COUNT)
     )
-    .eq("id", sessionId)
-    .eq("user_id", userId)
-    .maybeSingle();
+  ]);
+  console.timeEnd(`${timingId}:total`);
 
   if (sessionError) {
     throw new StudentPracticeError(
@@ -275,15 +297,6 @@ export async function getPracticeSession(userId: string, sessionId: string) {
     throw new StudentPracticeError("NOT_FOUND", "专项训练不存在", 404);
   }
 
-  const { data: records, error: recordsError } = await supabase
-    .from("practice_records")
-    .select(
-      "id, position, status, result, answered_at, added_to_mistakes_at, created_mistake_id, problems(id, question_type_id, problem_type, raw_latex, answer, analysis, question_types(id, level1, level2, level3))"
-    )
-    .eq("session_id", sessionId)
-    .eq("user_id", userId)
-    .order("position", { ascending: true });
-
   if (recordsError) {
     throw new StudentPracticeError(
       "SERVER_ERROR",
@@ -296,6 +309,46 @@ export async function getPracticeSession(userId: string, sessionId: string) {
     session as unknown as PracticeSessionRow,
     (records ?? []) as unknown as PracticeRecordRow[]
   );
+}
+
+export async function getPracticeRecordSolution(
+  userId: string,
+  recordId: string
+): Promise<PracticeRecordSolutionView> {
+  const supabase = await createClient();
+  const timingId = createTimingId("practice-solution");
+  console.time(`${timingId}:total`);
+  const { data, error } = await withTiming(`${timingId}:practice-problem`, () =>
+    supabase
+      .from("practice_records")
+      .select("id, problems(answer, analysis)")
+      .eq("id", recordId)
+      .eq("user_id", userId)
+      .maybeSingle()
+  );
+  console.timeEnd(`${timingId}:total`);
+
+  if (error) {
+    throw new StudentPracticeError(
+      "SERVER_ERROR",
+      `读取答案解析失败：${error.message}`,
+      500
+    );
+  }
+
+  if (!data) {
+    throw new StudentPracticeError("NOT_FOUND", "训练记录不存在", 404);
+  }
+
+  const problem = normalizeProblem(
+    (data as unknown as { problems: ProblemRow | ProblemRow[] | null }).problems
+  );
+
+  return {
+    recordId: data.id,
+    answer: problem?.answer ?? null,
+    analysis: problem?.analysis ?? null
+  };
 }
 
 export async function completePracticeRecord({
@@ -607,9 +660,7 @@ async function getCandidateProblems({
   const oversampleLimit = Math.max(limit * 5, 10);
   let query = supabase
     .from("problems")
-    .select(
-      "id, question_type_id, problem_type, raw_latex, answer, analysis, question_types(id, level1, level2, level3)"
-    )
+    .select("id, question_type_id, problem_type")
     .not("question_type_id", "is", null)
     .order("created_at", { ascending: false })
     .limit(oversampleLimit);
@@ -630,30 +681,25 @@ async function getCandidateProblems({
 
   const candidates: CandidateProblem[] = [];
 
-  for (const problem of (data ?? []) as unknown as ProblemRow[]) {
-    const questionType = normalizeQuestionType(problem.question_types);
-
-    if (!problem.question_type_id || !questionType) {
+  for (const problem of (data ?? []) as Array<{
+    id: string;
+    question_type_id: string | null;
+    problem_type: ProblemType;
+  }>) {
+    if (!problem.question_type_id) {
       continue;
     }
 
     candidates.push({
       id: problem.id,
       questionTypeId: problem.question_type_id,
-      problemType: problem.problem_type,
-      rawLatex: problem.raw_latex,
-      answer: problem.answer,
-      analysis: problem.analysis,
-      questionType,
-      hasSolution: hasContent(problem.answer) || hasContent(problem.analysis)
+      problemType: problem.problem_type
     });
   }
 
   return shuffle(
     candidates.filter((problem) => !excludeProblemIds.has(problem.id))
-  )
-    .sort((left, right) => Number(right.hasSolution) - Number(left.hasSolution))
-    .slice(0, limit);
+  ).slice(0, limit);
 }
 
 async function selectPracticeProblems({
@@ -739,7 +785,8 @@ async function getRelatedQuestionTypes(selectedQuestionType: QuestionTypeRow) {
     .from("question_types")
     .select("id, level1, level2, level3")
     .eq("is_active", true)
-    .eq("level1", selectedQuestionType.level1);
+    .eq("level1", selectedQuestionType.level1)
+    .limit(PRACTICE_QUESTION_TYPE_LIMIT);
 
   if (error) {
     throw new StudentPracticeError(
@@ -815,8 +862,11 @@ function normalizePracticeRecord(row: PracticeRecordRow): PracticeRecordView {
           id: problem.id,
           rawLatex: problem.raw_latex,
           displayLatex: problem.raw_latex,
-          answer: problem.answer,
-          analysis: problem.analysis,
+          answer: problem.answer ?? null,
+          analysis: problem.analysis ?? null,
+          solutionLoaded:
+            typeof problem.answer !== "undefined" ||
+            typeof problem.analysis !== "undefined",
           questionType: questionType
             ? {
                 ...questionType,
@@ -840,13 +890,31 @@ function getPracticeMistakeSource(problemId: string) {
   return `practice_problem:${problemId}`;
 }
 
-function hasContent(value: string | null | undefined) {
-  return Boolean(value?.trim());
-}
-
 function shuffle<T>(items: T[]) {
   return items
     .map((item) => ({ item, sortKey: Math.random() }))
     .sort((left, right) => left.sortKey - right.sortKey)
     .map(({ item }) => item);
+}
+
+function getEmbeddedProblemCount(
+  value: PracticeQuestionTypeWithCountRow["problems"]
+) {
+  const countRow = Array.isArray(value) ? value[0] : value;
+
+  return typeof countRow?.count === "number" ? countRow.count : 0;
+}
+
+function createTimingId(scope: string) {
+  return `${scope}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function withTiming<T>(label: string, task: () => PromiseLike<T>) {
+  console.time(label);
+
+  try {
+    return await task();
+  } finally {
+    console.timeEnd(label);
+  }
 }

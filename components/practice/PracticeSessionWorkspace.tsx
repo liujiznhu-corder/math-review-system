@@ -2,11 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowRight, CheckCircle2, Eye, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, Eye, LoaderCircle, XCircle } from "lucide-react";
 import { LatexContentRenderer } from "@/components/problems/LatexContentRenderer";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import type {
   PracticeRecordView,
+  PracticeRecordSolutionView,
   PracticeSessionView
 } from "@/services/student/practice";
 
@@ -43,6 +44,7 @@ export function PracticeSessionWorkspace({
     () => new Set()
   );
   const [message, setMessage] = useState("");
+  const [solutionLoadingRecordId, setSolutionLoadingRecordId] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const records = session.records;
@@ -52,8 +54,53 @@ export function PracticeSessionWorkspace({
     null;
   const completedCount = records.filter((record) => Boolean(record.result)).length;
 
-  function markAnswerViewed(recordId: string) {
-    setViewedRecordIds((current) => new Set(current).add(recordId));
+  async function loadAnswer(record: PracticeRecordView) {
+    if (!record.problem) {
+      return;
+    }
+
+    if (record.problem.solutionLoaded) {
+      setViewedRecordIds((current) => new Set(current).add(record.id));
+      return;
+    }
+
+    setMessage("");
+    setSolutionLoadingRecordId(record.id);
+
+    try {
+      const response = await fetch(
+        `/api/student/practice/records/${record.id}/solution`
+      );
+      const payload = (await response.json()) as
+        | ApiSuccess<PracticeRecordSolutionView>
+        | ApiFailure;
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setSession((current) => ({
+        ...current,
+        records: current.records.map((item) =>
+          item.id === record.id && item.problem
+            ? {
+                ...item,
+                problem: {
+                  ...item.problem,
+                  answer: payload.data.answer,
+                  analysis: payload.data.analysis,
+                  solutionLoaded: true
+                }
+              }
+            : item
+        )
+      }));
+      setViewedRecordIds((current) => new Set(current).add(record.id));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "答案解析加载失败");
+    } finally {
+      setSolutionLoadingRecordId("");
+    }
   }
 
   function moveToNextRecord(recordsToUse = records, current = activeRecord) {
@@ -104,7 +151,7 @@ export function PracticeSessionWorkspace({
           throw new Error(payload.error.message);
         }
 
-        setSession(payload.data);
+        setSession((current) => mergeLoadedSolutions(payload.data, current));
 
         const finished = payload.data.records.every(
           (item) => item.result === "mastered" || item.result === "not_mastered"
@@ -166,8 +213,9 @@ export function PracticeSessionWorkspace({
         <PracticeRecordDetail
           record={activeRecord}
           answerViewed={viewedRecordIds.has(activeRecord.id)}
+          answerLoading={solutionLoadingRecordId === activeRecord.id}
           disabled={isPending}
-          onViewAnswer={() => markAnswerViewed(activeRecord.id)}
+          onViewAnswer={() => loadAnswer(activeRecord)}
           onComplete={(result) => completeRecord(activeRecord, result)}
           onNext={() => moveToNextRecord()}
         />
@@ -224,6 +272,7 @@ function QuestionNavigator({
 function PracticeRecordDetail({
   record,
   answerViewed,
+  answerLoading,
   disabled,
   onViewAnswer,
   onComplete,
@@ -231,6 +280,7 @@ function PracticeRecordDetail({
 }: {
   record: PracticeRecordView;
   answerViewed: boolean;
+  answerLoading: boolean;
   disabled: boolean;
   onViewAnswer: () => void;
   onComplete: (result: "mastered" | "not_mastered") => void;
@@ -267,10 +317,15 @@ function PracticeRecordDetail({
           <button
             type="button"
             onClick={onViewAnswer}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-moss/25 bg-white px-4 text-sm font-medium text-moss sm:h-10 sm:w-auto"
+            disabled={answerLoading}
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-moss/25 bg-white px-4 text-sm font-medium text-moss disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:w-auto"
           >
-            <Eye className="h-4 w-4" />
-            查看答案
+            {answerLoading ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+            {answerLoading ? "加载中" : "查看答案"}
           </button>
 
           {answerViewed ? (
@@ -334,6 +389,43 @@ function PracticeRecordDetail({
       </div>
     </article>
   );
+}
+
+function mergeLoadedSolutions(
+  nextSession: PracticeSessionView,
+  currentSession: PracticeSessionView
+) {
+  const loadedSolutions = new Map(
+    currentSession.records
+      .filter((record) => record.problem?.solutionLoaded)
+      .map((record) => [
+        record.id,
+        {
+          answer: record.problem?.answer ?? null,
+          analysis: record.problem?.analysis ?? null
+        }
+      ])
+  );
+
+  return {
+    ...nextSession,
+    records: nextSession.records.map((record) => {
+      const loaded = loadedSolutions.get(record.id);
+
+      if (!loaded || !record.problem) {
+        return record;
+      }
+
+      return {
+        ...record,
+        problem: {
+          ...record.problem,
+          ...loaded,
+          solutionLoaded: true
+        }
+      };
+    })
+  };
 }
 
 function getRecordStatus(record: PracticeRecordView, answerViewed: boolean): RecordStatus {
