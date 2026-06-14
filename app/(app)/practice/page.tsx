@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Home } from "lucide-react";
+import { Home, Sparkles } from "lucide-react";
 import { PracticeStartForm } from "@/components/practice/PracticeStartForm";
 import { redirectTeacherToDashboard } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
@@ -40,6 +40,7 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
       <PracticeHeader message={params?.message} />
       <PracticeStartForm
         questionTypes={options.questionTypes}
+        questionCount={options.questionCount}
         action={startPracticeSession}
       />
     </main>
@@ -52,9 +53,15 @@ function PracticeHeader({ message }: { message?: string }) {
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-medium text-clay">主动刷题</p>
-          <h1 className="mt-1 text-2xl font-semibold text-ink">专项训练 V1</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-semibold text-ink">专项训练 V1</h1>
+            <span className="inline-flex h-8 items-center gap-2 rounded-md bg-moss/10 px-3 text-sm font-medium text-moss">
+              <Sparkles className="h-4 w-4" />
+              每组 5 题
+            </span>
+          </div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
-            专项训练从教师题库抽题，和今日复习、薄弱巩固保持独立；未掌握题可以手动加入错题库。
+            专项训练从教师题库抽题，和今日复习、薄弱巩固保持独立；先选定三级题型，再进入新的训练界面逐题作答。
           </p>
         </div>
         <Link
