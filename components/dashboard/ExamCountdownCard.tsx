@@ -8,25 +8,29 @@ export function ExamCountdownCard() {
   const remainingDays = getRemainingDays();
 
   return (
-    <section className="rounded-md border border-ink/10 bg-white p-5 text-center shadow-sm sm:p-10">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-moss/10 text-moss">
-        <CalendarDays className="h-6 w-6" />
+    <section className="flex min-h-full flex-col justify-between rounded-2xl border border-emerald-100 bg-[#F3F8F4] p-5 text-[#1A362D] shadow-sm sm:p-6">
+      <div>
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-sm">
+          <CalendarDays className="h-6 w-6" />
+        </div>
+        <p className="mt-6 text-sm font-medium text-emerald-800/70">
+          考试日期：{examDateLabel}
+        </p>
+        <h2 className="mt-2 text-xl font-semibold text-[#1A362D]">
+          江苏专转本数学考试倒计时
+        </h2>
       </div>
-      <p className="mt-6 text-sm font-medium text-clay">
-        考试日期：{examDateLabel}
-      </p>
-      <h1 className="mt-2 text-2xl font-semibold text-ink sm:text-3xl">
-        江苏专转本数学考试倒计时
-      </h1>
-      <div className="mt-8 flex items-end justify-center gap-3">
-        <span className="text-6xl font-semibold leading-none text-ink sm:text-8xl">
-          {remainingDays}
-        </span>
-        <span className="pb-2 text-xl font-medium text-ink/60">天</span>
+      <div className="mt-10">
+        <div className="flex items-end gap-3">
+          <span className="text-7xl font-semibold leading-none text-[#166534]">
+            {remainingDays}
+          </span>
+          <span className="pb-2 text-xl font-medium text-[#1A362D]/65">天</span>
+        </div>
+        <p className="mt-6 text-sm leading-6 text-[#1A362D]/70">
+          今天多复盘一道错题，考场上就少一个失分点。
+        </p>
       </div>
-      <p className="mx-auto mt-8 max-w-xl text-base leading-7 text-ink/70">
-        今天多复盘一道错题，考场上就少一个失分点。
-      </p>
     </section>
   );
 }
