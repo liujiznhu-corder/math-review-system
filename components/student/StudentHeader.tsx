@@ -17,11 +17,11 @@ export function StudentHeader({
         {eyebrow ? (
           <p className="text-sm font-medium text-clay">{eyebrow}</p>
         ) : null}
-        <h1 className="mt-2 text-3xl font-semibold text-ink sm:text-4xl">
+        <h1 className="mt-2 text-3xl font-semibold text-ink">
           {title}
         </h1>
         {description ? (
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-ink/65 sm:text-base sm:leading-7">
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-ink/65">
             {description}
           </p>
         ) : null}

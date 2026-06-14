@@ -19,7 +19,7 @@ export function StudentPageShell({
   return (
     <main
       className={clsx(
-        "min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(49,88,70,0.08),transparent_34rem),linear-gradient(180deg,#fbfaf6_0%,#f8f6f0_48%,#f4f7fb_100%)] px-4 py-5 sm:px-6 sm:py-8",
+        "min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(49,88,70,0.08),transparent_34rem),linear-gradient(180deg,#fbfaf6_0%,#f8f6f0_48%,#f4f7fb_100%)] px-4 py-4 sm:px-6 sm:py-6",
         className
       )}
     >

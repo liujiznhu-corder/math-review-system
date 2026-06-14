@@ -56,22 +56,20 @@ async function StudentDashboard({ userId }: { userId: string }) {
 
   return (
     <StudentPageShell maxWidth="6xl">
-      <div className="space-y-8">
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <StudentCard variant="soft" padding="lg">
+      <div className="space-y-5">
+        <section className="grid grid-cols-1 items-start gap-5 min-[900px]:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)] xl:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
+          <StudentCard variant="soft" padding="md">
             <StudentHeader
               eyebrow="学习仪表盘"
               title="今天的数学复盘"
               description="先看今天任务，再决定从复习、错题录入还是专项训练开始。保留现有学习数据，只把下一步行动变得更清楚。"
             />
-            <div className="mt-8 rounded-2xl border border-moss/10 bg-moss/5 px-4 py-4">
-              <p className="text-sm font-semibold text-moss">
-                今日建议
-              </p>
+            <div className="mt-5 rounded-2xl border border-moss/10 bg-moss/5 px-4 py-3">
+              <p className="text-sm font-semibold text-moss">今日建议</p>
               <p className="mt-2 text-sm leading-6 text-ink/70">
                 先完成到期复习 → 再进行薄弱巩固 → 最后录入新错题。
               </p>
-              <p className="mt-3 text-xs leading-5 text-ink/50">
+              <p className="mt-2 text-xs leading-5 text-ink/50">
                 下方入口卡片会带你进入对应流程，今天只要从第一步开始就很好。
               </p>
             </div>
