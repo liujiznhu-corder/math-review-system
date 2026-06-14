@@ -100,7 +100,7 @@ export async function saveMistake(formData: FormData) {
   }
 
   if (!submitForReview && !questionTypeId) {
-    redirect(withMessage("/mistakes/new", "请选择一个推荐题型"));
+    redirect(withMessage("/mistakes/new", "请先选择题型，或者改用“提交教师审核”。"));
   }
 
   const supabase = await createClient();
@@ -147,7 +147,9 @@ export async function saveMistake(formData: FormData) {
   redirect(
     withMessage(
       "/mistakes",
-      submitForReview ? "错题已提交教师审核" : "错题已保存"
+      submitForReview
+        ? "已提交给老师审核，确认题型后会进入复习计划。"
+        : "已保存到错题库，系统将安排复习任务。"
     )
   );
 }

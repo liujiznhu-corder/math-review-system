@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { type MouseEvent, useMemo, useState, useTransition } from "react";
+import { useFormStatus } from "react-dom";
 import {
   Bot,
   CheckCircle2,
   ClipboardCopy,
+  Loader2,
   Send,
   Save,
   Sparkles,
@@ -24,6 +26,7 @@ type MistakeEntryFormProps = {
 };
 
 type PromptType = "single_choice" | "fill_blank" | "calculation";
+type SubmitIntent = "save" | "submit_review" | null;
 
 type PromptTemplate = {
   type: PromptType;
@@ -118,6 +121,8 @@ export function MistakeEntryForm({
   const [selectedPromptType, setSelectedPromptType] =
     useState<PromptType>("single_choice");
   const [copyMessage, setCopyMessage] = useState("");
+  const [formHint, setFormHint] = useState("");
+  const [submitIntent, setSubmitIntent] = useState<SubmitIntent>(null);
   const [isPending, startTransition] = useTransition();
 
   const trimmedLatex = latexContent.trim();
@@ -128,9 +133,11 @@ export function MistakeEntryForm({
     () => trimmedLatex.length > 0 && selectedQuestionTypeId.length > 0,
     [selectedQuestionTypeId, trimmedLatex]
   );
+  const hasLatex = trimmedLatex.length > 0;
 
   function handleRecommend() {
     setErrorMessage("");
+    setFormHint("");
     setSelectedQuestionTypeId("");
 
     startTransition(async () => {
@@ -164,211 +171,263 @@ export function MistakeEntryForm({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+    <>
       <form
         action={saveMistake}
-        className="rounded-md border border-ink/10 bg-white p-4 shadow-sm sm:p-5"
+        className="grid gap-5 min-[980px]:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]"
       >
         <input type="hidden" name="questionTypeId" value={selectedQuestionTypeId} />
         <input type="hidden" name="inputType" value="latex" />
         <input type="hidden" name="rawText" value="" />
 
-        <div>
-          <p className="text-sm font-medium text-clay">AI 录题助手模式</p>
-          <h2 className="mt-1 text-lg font-semibold text-ink">录入错题 LaTeX</h2>
-          <p className="mt-2 text-sm leading-6 text-ink/65">
-            系统内暂不做 OCR。请先用外部 AI 工具把题目图片转成规定格式的
-            LaTeX，再粘贴到这里检查预览。
-          </p>
-        </div>
+        <section className="rounded-2xl border border-ink/10 bg-white/95 p-4 shadow-sm sm:p-5">
+          <div>
+            <p className="text-sm font-medium text-clay">左侧主栏</p>
+            <h2 className="mt-1 text-xl font-semibold text-ink">
+              粘贴 LaTeX 并检查预览
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-ink/65">
+              先把外部 AI 转写出的 LaTeX 放进来，确认题干和选项显示正常，再补充备注。
+            </p>
+          </div>
 
-        {message ? (
-          <p className="mt-5 rounded-md border border-clay/30 bg-clay/10 px-3 py-2 text-sm text-clay">
-            {message}
-          </p>
-        ) : null}
+          {message ? (
+            <p className="mt-5 rounded-xl border border-clay/30 bg-clay/10 px-4 py-3 text-sm text-clay">
+              {message}
+            </p>
+          ) : null}
 
-        <section className="mt-5 rounded-md border border-moss/15 bg-moss/5 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-ink">推荐流程</h3>
-              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-6 text-ink/65">
-                <li>拍清楚题目图片</li>
-                <li>打开豆包 / DeepSeek / ChatGPT</li>
-                <li>复制本系统提供的提示词</li>
-                <li>让 AI 转成 LaTeX 代码</li>
-                <li>粘贴回本页面</li>
-                <li>检查预览无误后保存</li>
-              </ol>
+          <div className="mt-5 grid gap-3 rounded-2xl border border-moss/15 bg-moss/5 p-3 text-sm text-ink/70 sm:grid-cols-4">
+            {["粘贴 LaTeX", "查看预览", "选择题型", "保存或审核"].map(
+              (step, index) => (
+                <div key={step} className="flex items-center gap-2">
+                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-moss shadow-sm">
+                    {index + 1}
+                  </span>
+                  <span className="font-medium">{step}</span>
+                </div>
+              )
+            )}
+          </div>
+
+          <div className="mt-5 grid gap-4">
+            <label className="block text-sm font-medium text-ink">
+              题目 LaTeX 代码
+              <span className="mt-1 block text-xs font-normal leading-5 text-ink/50">
+                支持系统现有的 \blankbox、\fourchoices 等格式；长公式会在预览区横向滚动。
+              </span>
+              <textarea
+                name="latexContent"
+                required
+                rows={13}
+                value={latexContent}
+                onChange={(event) => {
+                  setLatexContent(event.target.value);
+                  setFormHint("");
+                }}
+                placeholder={latexPlaceholder}
+                className="mt-2 min-h-[260px] w-full resize-y rounded-xl border border-ink/15 bg-white px-3 py-3 font-mono text-sm leading-6 outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/10"
+              />
+            </label>
+
+            <div className="max-w-full overflow-x-auto rounded-2xl border border-ink/10 bg-paper p-4">
+              <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-semibold text-ink">LaTeX 实时预览</p>
+                <p className="text-xs text-ink/45">长公式可横向滚动</p>
+              </div>
+              <LatexProblemRenderer
+                rawLatex={latexContent}
+                fallback="输入 LaTeX 后显示预览"
+              />
+              <p className="mt-3 text-xs leading-5 text-ink/45">
+                如果公式语法暂时不完整，预览区会保留原文提示，不会影响你继续编辑。
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setAssistantOpen(true)}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white sm:w-auto"
-            >
-              <Bot className="h-4 w-4" />
-              AI 录题助手
-            </button>
+
+            <label className="block text-sm font-medium text-ink">
+              备注
+              <span className="mt-1 block text-xs font-normal leading-5 text-ink/50">
+                可记录错误原因、解题卡点或下次复盘提醒。
+              </span>
+              <textarea
+                name="note"
+                rows={4}
+                placeholder="例如：等价无穷小替换漏掉了使用条件。"
+                className="mt-2 w-full rounded-xl border border-ink/15 bg-white px-3 py-3 text-sm leading-6 outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/10"
+              />
+            </label>
           </div>
         </section>
 
-        <div className="mt-5 grid gap-4">
-          <label className="block text-sm font-medium text-ink">
-            题目 LaTeX 代码
-            <textarea
-              name="latexContent"
-              required
-              rows={12}
-              value={latexContent}
-              onChange={(event) => setLatexContent(event.target.value)}
-              placeholder={latexPlaceholder}
-              className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 font-mono text-sm leading-6 outline-none focus:border-moss"
-            />
-          </label>
-          <div className="max-w-full overflow-x-auto rounded-md border border-ink/10 bg-paper p-4">
-            <p className="mb-3 text-sm font-medium text-ink">实时预览</p>
-            <LatexProblemRenderer
-              rawLatex={latexContent}
-              fallback="输入 LaTeX 后显示预览"
-            />
-          </div>
-        </div>
-
-        <label className="mt-4 block text-sm font-medium text-ink">
-          最终题型
-          <select
-            name="manualQuestionTypeId"
-            value={selectedQuestionTypeId}
-            onChange={(event) => setSelectedQuestionTypeId(event.target.value)}
-            className="mt-2 h-10 w-full rounded-md border border-ink/15 bg-white px-3 text-sm outline-none focus:border-moss"
-          >
-            <option value="">从推荐结果选择，或手动选择已有题型</option>
-            {questionTypes.map((questionType) => (
-              <option key={questionType.id} value={questionType.id}>
-                {questionType.level1} / {questionType.level2} /{" "}
-                {questionType.level3}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="mt-4 block text-sm font-medium text-ink">
-          备注
-          <textarea
-            name="note"
-            rows={4}
-            placeholder="可记录错误原因、解题卡点或复盘提醒。"
-            className="mt-2 w-full rounded-md border border-ink/15 px-3 py-2 text-sm leading-6 outline-none focus:border-moss"
-          />
-        </label>
-
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          <button
-            type="button"
-            onClick={handleRecommend}
-            disabled={isPending || trimmedLatex.length === 0}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-55 sm:h-10"
-          >
-            <Sparkles className="h-4 w-4" />
-            {isPending ? "推荐中" : "智能推荐题型"}
-          </button>
-          <button
-            type="submit"
-            name="intent"
-            value="save"
-            disabled={!canSave}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-ink/15 bg-white px-4 text-sm font-medium text-ink disabled:cursor-not-allowed disabled:opacity-55 sm:h-10"
-          >
-            <Save className="h-4 w-4" />
-            保存错题
-          </button>
-          <button
-            type="submit"
-            name="intent"
-            value="submit_review"
-            disabled={trimmedLatex.length === 0}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-clay/25 bg-clay/10 px-4 text-sm font-medium text-clay disabled:cursor-not-allowed disabled:opacity-55 sm:h-10"
-          >
-            <Send className="h-4 w-4" />
-            提交教师审核
-          </button>
-        </div>
-      </form>
-
-      <aside className="rounded-md border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
-        <h2 className="text-lg font-semibold text-ink">推荐题型</h2>
-        <p className="mt-2 text-sm leading-6 text-ink/65">
-          推荐结果来自数据库题型库，使用识别特征和代表例题相似度进行匹配。
-        </p>
-
-        {errorMessage ? (
-          <p className="mt-5 rounded-md border border-clay/30 bg-clay/10 px-3 py-2 text-sm text-clay">
-            {errorMessage}
-          </p>
-        ) : null}
-
-        <div className="mt-5 space-y-3">
-          {recommendations.length === 0 && !errorMessage ? (
-            <div className="rounded-md border border-dashed border-ink/20 bg-paper px-4 py-8 text-center text-sm text-ink/60">
-              粘贴 LaTeX 后点击智能推荐，系统会显示最可能的 3 个题型。
-            </div>
-          ) : null}
-
-          {recommendations.map((recommendation, index) => {
-            const selected =
-              recommendation.questionTypeId === selectedQuestionTypeId;
-
-            return (
-              <button
-                key={recommendation.questionTypeId}
-                type="button"
-                onClick={() =>
-                  setSelectedQuestionTypeId(recommendation.questionTypeId)
-                }
-                className={`w-full rounded-md border p-4 text-left transition ${
-                  selected
-                    ? "border-moss bg-moss/10"
-                    : "border-ink/10 bg-paper hover:border-moss/40"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-medium text-clay">
-                      推荐 {index + 1}
-                    </p>
-                    <h3 className="mt-1 text-base font-semibold text-ink">
-                      {recommendation.level3}
-                    </h3>
-                    <p className="mt-1 text-sm text-ink/60">
-                      {recommendation.level1} / {recommendation.level2}
-                    </p>
-                  </div>
-                  {selected ? (
-                    <CheckCircle2 className="h-5 w-5 shrink-0 text-moss" />
-                  ) : null}
-                </div>
-
-                <p className="mt-3 text-sm font-medium text-ink">
-                  匹配分数：{recommendation.score}
+        <aside className="self-start rounded-2xl border border-ink/10 bg-white/95 p-4 shadow-sm sm:p-5 min-[980px]:sticky min-[980px]:top-5">
+          <section className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-sky-700">
+                  AI 录题助手
                 </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(recommendation.reasons.length > 0
-                    ? recommendation.reasons
-                    : ["暂无明显匹配理由"]
-                  ).map((reason) => (
-                    <span
-                      key={reason}
-                      className="rounded-md bg-white px-2 py-1 text-xs text-ink/70"
-                    >
-                      {reason}
-                    </span>
-                  ))}
-                </div>
+                <h2 className="mt-1 text-lg font-semibold text-ink">
+                  先把图片转成 LaTeX
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAssistantOpen(true)}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-moss px-3 text-sm font-medium text-white"
+              >
+                <Bot className="h-4 w-4" />
+                打开
               </button>
-            );
-          })}
-        </div>
-      </aside>
+            </div>
+            <ol className="mt-3 space-y-1 text-sm leading-6 text-ink/65">
+              <li>1. 复制提示词到外部 AI 工具。</li>
+              <li>2. 粘贴返回的 LaTeX 到左侧输入框。</li>
+              <li>3. 检查预览后再选择保存或审核。</li>
+            </ol>
+          </section>
+
+          <section className="mt-4 rounded-2xl border border-ink/10 bg-paper/70 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between min-[980px]:flex-col">
+              <div>
+                <h2 className="text-lg font-semibold text-ink">智能推荐题型</h2>
+                <p className="mt-1 text-sm leading-6 text-ink/60">
+                  推荐 top 3 来自题型库相似度匹配，也可以在下方手动选择。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleRecommend}
+                disabled={isPending || !hasLatex}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-moss px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto min-[980px]:w-full"
+              >
+                {isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                {isPending ? "推荐中" : "智能推荐题型"}
+              </button>
+            </div>
+
+            {errorMessage ? (
+              <p className="mt-4 rounded-xl border border-clay/30 bg-clay/10 px-3 py-2 text-sm text-clay">
+                {errorMessage}
+              </p>
+            ) : null}
+
+            <div className="mt-4 space-y-3">
+              {recommendations.length === 0 && !errorMessage ? (
+                <div className="rounded-xl border border-dashed border-ink/20 bg-white px-4 py-6 text-center text-sm leading-6 text-ink/60">
+                  粘贴 LaTeX 后点击智能推荐，系统会显示最可能的 3 个题型。
+                </div>
+              ) : null}
+
+              {recommendations.map((recommendation, index) => {
+                const selected =
+                  recommendation.questionTypeId === selectedQuestionTypeId;
+
+                return (
+                  <button
+                    key={recommendation.questionTypeId}
+                    type="button"
+                    onClick={() => {
+                      setSelectedQuestionTypeId(recommendation.questionTypeId);
+                      setFormHint("");
+                    }}
+                    className={`w-full rounded-xl border p-4 text-left transition ${
+                      selected
+                        ? "border-moss bg-moss/10 shadow-sm"
+                        : "border-ink/10 bg-white hover:border-moss/40"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-medium text-clay">
+                          推荐 {index + 1}
+                        </p>
+                        <h3 className="mt-1 text-base font-semibold text-ink">
+                          {recommendation.level3}
+                        </h3>
+                        <p className="mt-1 text-sm text-ink/60">
+                          {recommendation.level1} / {recommendation.level2}
+                        </p>
+                      </div>
+                      {selected ? (
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-moss" />
+                      ) : null}
+                    </div>
+
+                    <p className="mt-3 text-sm font-medium text-ink">
+                      匹配分数：{recommendation.score}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(recommendation.reasons.length > 0
+                        ? recommendation.reasons
+                        : ["暂无明显匹配理由"]
+                      ).map((reason) => (
+                        <span
+                          key={reason}
+                          className="rounded-md bg-paper px-2 py-1 text-xs text-ink/70"
+                        >
+                          {reason}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <label className="mt-4 block text-sm font-medium text-ink">
+            手动选择题型
+            <select
+              name="manualQuestionTypeId"
+              value={selectedQuestionTypeId}
+              onChange={(event) => {
+                setSelectedQuestionTypeId(event.target.value);
+                setFormHint("");
+              }}
+              className="mt-2 h-11 w-full rounded-xl border border-ink/15 bg-white px-3 text-sm outline-none transition focus:border-moss focus:ring-2 focus:ring-moss/10"
+            >
+              <option value="">从推荐结果选择，或手动选择已有题型</option>
+              {questionTypes.map((questionType) => (
+                <option key={questionType.id} value={questionType.id}>
+                  {questionType.level1} / {questionType.level2} /{" "}
+                  {questionType.level3}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <section className="mt-4 rounded-2xl border border-moss/15 bg-moss/5 p-4">
+            <h2 className="text-base font-semibold text-ink">提交方式</h2>
+            <div className="mt-2 space-y-1 text-sm leading-6 text-ink/65">
+              <p>已经确定题型？保存后会进入复习计划。</p>
+              <p>不确定题型？可以先提交给老师审核。</p>
+            </div>
+
+            {formHint ? (
+              <p
+                id="mistake-save-hint"
+                role="alert"
+                className="mt-3 rounded-xl border border-clay/30 bg-white px-3 py-2 text-sm text-clay"
+              >
+                {formHint}
+              </p>
+            ) : null}
+
+            <MistakeSubmitActions
+              canSave={canSave}
+              hasLatex={hasLatex}
+              hasSelectedQuestionType={selectedQuestionTypeId.length > 0}
+              submitIntent={submitIntent}
+              onHint={setFormHint}
+              onIntent={setSubmitIntent}
+            />
+          </section>
+        </aside>
+      </form>
 
       {assistantOpen ? (
         <AiPromptAssistantModal
@@ -386,6 +445,83 @@ export function MistakeEntryForm({
           }}
         />
       ) : null}
+    </>
+  );
+}
+
+function MistakeSubmitActions({
+  canSave,
+  hasLatex,
+  hasSelectedQuestionType,
+  submitIntent,
+  onHint,
+  onIntent
+}: {
+  canSave: boolean;
+  hasLatex: boolean;
+  hasSelectedQuestionType: boolean;
+  submitIntent: SubmitIntent;
+  onHint: (message: string) => void;
+  onIntent: (intent: SubmitIntent) => void;
+}) {
+  const { pending } = useFormStatus();
+
+  function handleSaveClick(event: MouseEvent<HTMLButtonElement>) {
+    onIntent("save");
+
+    if (!hasSelectedQuestionType) {
+      event.preventDefault();
+      onHint("请先选择题型，或者改用“提交教师审核”。");
+      return;
+    }
+
+    onHint("");
+  }
+
+  function handleReviewClick() {
+    onIntent("submit_review");
+    onHint("");
+  }
+
+  const saving = pending && submitIntent === "save";
+  const submittingReview = pending && submitIntent === "submit_review";
+
+  return (
+    <div className="mt-4 grid gap-3">
+      <button
+        type="submit"
+        name="intent"
+        value="save"
+        onClick={handleSaveClick}
+        aria-busy={saving}
+        aria-describedby={!canSave && hasLatex ? "mistake-save-hint" : undefined}
+        disabled={pending || !hasLatex}
+        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-moss px-4 text-sm font-medium text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-55"
+      >
+        {saving ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Save className="h-4 w-4" />
+        )}
+        {saving ? "保存中" : "保存错题"}
+      </button>
+
+      <button
+        type="submit"
+        name="intent"
+        value="submit_review"
+        onClick={handleReviewClick}
+        aria-busy={submittingReview}
+        disabled={pending || !hasLatex}
+        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-clay/25 bg-white px-4 text-sm font-medium text-clay transition hover:bg-clay/10 disabled:cursor-not-allowed disabled:opacity-55"
+      >
+        {submittingReview ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Send className="h-4 w-4" />
+        )}
+        {submittingReview ? "提交中" : "提交教师审核"}
+      </button>
     </div>
   );
 }
