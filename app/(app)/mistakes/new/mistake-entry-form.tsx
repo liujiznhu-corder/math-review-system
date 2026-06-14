@@ -26,6 +26,7 @@ type MistakeEntryFormProps = {
 };
 
 type PromptType = "single_choice" | "fill_blank" | "calculation";
+type PromptChannel = "web" | "app";
 type SubmitIntent = "save" | "submit_review" | null;
 
 type PromptTemplate = {
@@ -33,12 +34,102 @@ type PromptTemplate = {
   label: string;
   title: string;
   description: string;
-  prompt: string;
+  webPrompt: string;
+  appPrompt: string;
 };
 
 const latexPlaceholder = String.raw`若函数$f(x)$在$x=1$处连续,且$\lim\limits_{x \to 1}\frac{f(x)}{x-1}=2,$则$\lim\limits_{x \to 0}\frac{f(1-2x)}{x}=$\blankbox
 \fourchoices
 {$-4$}{$-1$}{$1$}{$4$}`;
+
+const commonPromptRules = [
+  "所有数学表达式必须使用 `$...$` 包裹。",
+  "只使用行内公式 `$...$`。",
+  "不要使用 `\\(...\\)`、`\\[...\\]`、`$$...$$`。",
+  "不要把整句中文放进 `$...$`，只包裹数学表达式。",
+  "如果题干中出现变量、公式、数学符号、运算表达式，但没有被 `$...$` 包裹，必须先修正后再输出。",
+  "不要输出答案。",
+  "不要输出解析。",
+  "不要使用 JSON。"
+];
+
+const webPromptRules = [
+  "只输出题目代码，不输出解释。",
+  "不使用 Markdown 代码块。",
+  "直接输出可粘贴到系统中的 LaTeX 代码。"
+];
+
+const appPromptRules = [
+  "请把最终结果放在一个纯文本代码块中输出，代码块语言使用 text。",
+  "代码块内必须保留所有 `$`、`\\frac`、`\\lim`、`\\fourchoices` 等 LaTeX 符号，不要让公式被渲染成数学显示效果。",
+  "除代码块内题目代码外，不输出任何解释、答案、解析或多余文字。"
+];
+
+const singleChoiceRules = [
+  "选择题空格、括号、填空位置统一使用 `\\blankbox`。",
+  "四个选项必须使用：",
+  String.raw`\fourchoices`,
+  "{选项A}{选项B}{选项C}{选项D}",
+  "选项内容如果是数学表达式，必须使用 `$...$` 包裹。",
+  "不要输出 A、B、C、D 字母标签。"
+];
+
+const fillBlankRules = [
+  String.raw`填空位置统一使用 \_\_\_。`,
+  "所有数学表达式必须使用 `$...$` 包裹。"
+];
+
+const calculationRules = [
+  "如果题目是求极限、求导、积分、证明题，请完整保留题目条件。",
+  "所有数学表达式必须使用 `$...$` 包裹。"
+];
+
+const singleChoiceExample = [
+  String.raw`若函数$f(x)$在$x=1$处连续，且$\lim\limits_{x \to 1}\frac{f(x)}{x-1}=2$，则$\lim\limits_{x \to 0}\frac{f(1-2x)}{x}=$\blankbox`,
+  String.raw`\fourchoices`,
+  String.raw`{$-4$}{$-1$}{$1$}{$4$}`
+];
+
+const fillBlankExample = [
+  String.raw`已知曲线$f(x)=\dfrac{e^x-1}{x-a}$有垂直渐近线$x=3$，则$a=$\_\_\_`
+];
+
+const calculationExample = [
+  "求极限：",
+  String.raw`$\lim\limits_{x \to 0}\dfrac{e^{x-\sin x}-1}{\arcsin x^3}$`
+];
+
+function buildPrompt({
+  channel,
+  typeRules,
+  example
+}: {
+  channel: PromptChannel;
+  typeRules: string[];
+  example: string[];
+}) {
+  const outputRules = channel === "web" ? webPromptRules : appPromptRules;
+  const exampleLines =
+    channel === "web" ? example : ["```text", ...example, "```"];
+
+  return [
+    "请将我提供的数学题图片或文字转换为可直接粘贴到系统中的 LaTeX 代码。",
+    "",
+    "通用规则：",
+    ...commonPromptRules.map((rule, index) => `${index + 1}. ${rule}`),
+    "",
+    "输出规则：",
+    ...outputRules.map((rule, index) => `${index + 1}. ${rule}`),
+    "",
+    "题型规则：",
+    ...typeRules.map((rule, index) => `${index + 1}. ${rule}`),
+    "",
+    channel === "web"
+      ? "输出格式示例："
+      : "输出格式示例（手机 App 版必须使用 text 代码块）：",
+    ...exampleLines
+  ].join("\n");
+}
 
 const promptTemplates: PromptTemplate[] = [
   {
@@ -46,64 +137,48 @@ const promptTemplates: PromptTemplate[] = [
     label: "单选题",
     title: "单选题 LaTeX 转写提示词",
     description: "适合包含 A/B/C/D 四个选项的选择题，输出可直接粘贴进本系统。",
-    prompt: String.raw`请将我提供的数学题图片或文字转换为可直接粘贴到系统中的 LaTeX 代码。
-
-要求：
-1. 只输出题目代码，不输出解释。
-2. 保留题干中的数学公式。
-3. 选择题空格统一使用 \blankbox。
-4. 四个选项必须使用：
-\fourchoices
-{选项A}{选项B}{选项C}{选项D}
-5. 选项内容如果是数学公式，请使用 $...$ 包裹。
-6. 不要输出答案。
-7. 不要输出解析。
-8. 不要使用 JSON。
-9. 不要使用 Markdown 代码块。
-
-输出格式示例：
-若函数$f(x)$在$x=1$处连续,且$\lim\limits_{x \to 1}\frac{f(x)}{x-1}=2,$则$\lim\limits_{x \to 0}\frac{f(1-2x)}{x}=$\blankbox
-\fourchoices
-{$-4$}{$-1$}{$1$}{$4$}`
+    webPrompt: buildPrompt({
+      channel: "web",
+      typeRules: singleChoiceRules,
+      example: singleChoiceExample
+    }),
+    appPrompt: buildPrompt({
+      channel: "app",
+      typeRules: singleChoiceRules,
+      example: singleChoiceExample
+    })
   },
   {
     type: "fill_blank",
     label: "填空题",
     title: "填空题 LaTeX 转写提示词",
     description: "适合没有选项、需要填写一个或多个空的题目。",
-    prompt: String.raw`请将我提供的数学题图片或文字转换为可直接粘贴到系统中的 LaTeX 代码。
-
-要求：
-1. 只输出题目代码，不输出解释。
-2. 保留题干中的数学公式。
-3. 填空位置统一使用 \_\_\_。
-4. 不要输出答案。
-5. 不要输出解析。
-6. 不要使用 JSON。
-7. 不要使用 Markdown 代码块。
-
-输出格式示例：
-已知曲线$f(x)=\dfrac{e^x-1}{x-a}$有垂直渐近线$x=3$，则$a=$\_\_\_`
+    webPrompt: buildPrompt({
+      channel: "web",
+      typeRules: fillBlankRules,
+      example: fillBlankExample
+    }),
+    appPrompt: buildPrompt({
+      channel: "app",
+      typeRules: fillBlankRules,
+      example: fillBlankExample
+    })
   },
   {
     type: "calculation",
     label: "计算题",
     title: "计算题 LaTeX 转写提示词",
     description: "适合极限、导数、积分、证明等需要完整保留条件的题目。",
-    prompt: String.raw`请将我提供的数学题图片或文字转换为可直接粘贴到系统中的 LaTeX 代码。
-
-要求：
-1. 只输出题目代码，不输出解释。
-2. 保留题干中的数学公式。
-3. 不要输出答案。
-4. 不要输出解析。
-5. 不要使用 JSON。
-6. 不要使用 Markdown 代码块。
-7. 如果题目是求极限、求导、积分、证明题，请完整保留题目条件。
-
-输出格式示例：
-求极限：
-$\lim\limits_{x \to 0}\dfrac{e^{x-\sin x}-1}{\arcsin x^3}$`
+    webPrompt: buildPrompt({
+      channel: "web",
+      typeRules: calculationRules,
+      example: calculationExample
+    }),
+    appPrompt: buildPrompt({
+      channel: "app",
+      typeRules: calculationRules,
+      example: calculationExample
+    })
   }
 ];
 
@@ -161,10 +236,16 @@ export function MistakeEntryForm({
     });
   }
 
-  async function copyPrompt() {
+  async function copyPrompt(channel: PromptChannel) {
+    const prompt =
+      channel === "web" ? activeTemplate.webPrompt : activeTemplate.appPrompt;
+    const channelLabel = channel === "web" ? "网页端" : "手机 App";
+
     try {
-      await navigator.clipboard.writeText(activeTemplate.prompt);
-      setCopyMessage("提示词已复制，可以粘贴到豆包 / DeepSeek / ChatGPT。");
+      await navigator.clipboard.writeText(prompt);
+      setCopyMessage(
+        `${channelLabel}提示词已复制，可以粘贴到豆包 / DeepSeek / ChatGPT。`
+      );
     } catch {
       setCopyMessage("复制失败，请手动选中提示词复制。");
     }
@@ -538,7 +619,7 @@ function AiPromptAssistantModal({
   selectedPromptType: PromptType;
   copyMessage: string;
   onSelect: (type: PromptType) => void;
-  onCopy: () => void;
+  onCopy: (channel: PromptChannel) => void;
   onClose: () => void;
 }) {
   return (
@@ -582,23 +663,13 @@ function AiPromptAssistantModal({
         </div>
 
         <section className="mt-5 rounded-md border border-ink/10 bg-paper p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h3 className="text-base font-semibold text-ink">
-                {activeTemplate.title}
-              </h3>
-              <p className="mt-1 text-sm leading-6 text-ink/60">
-                {activeTemplate.description}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onCopy}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white sm:w-auto"
-            >
-              <ClipboardCopy className="h-4 w-4" />
-              一键复制
-            </button>
+          <div>
+            <h3 className="text-base font-semibold text-ink">
+              {activeTemplate.title}
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-ink/60">
+              {activeTemplate.description}
+            </p>
           </div>
 
           {copyMessage ? (
@@ -607,14 +678,64 @@ function AiPromptAssistantModal({
             </p>
           ) : null}
 
-          <textarea
-            readOnly
-            value={activeTemplate.prompt}
-            rows={18}
-            className="mt-4 w-full rounded-md border border-ink/10 bg-white px-3 py-2 font-mono text-xs leading-6 text-ink/75 outline-none"
-          />
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <PromptCopyPanel
+              title="网页端提示词"
+              description="适合在电脑或网页端使用。AI 会直接输出可粘贴到系统中的 LaTeX 题目代码，不使用 Markdown 代码块。"
+              buttonLabel="复制网页端提示词"
+              prompt={activeTemplate.webPrompt}
+              onCopy={() => onCopy("web")}
+            />
+            <PromptCopyPanel
+              title="手机 App 提示词"
+              description="手机 App 中建议使用此版本。生成结果会放在 text 代码块中，更容易保留 `$`、`\\frac`、`\\lim`、`\\fourchoices` 等 LaTeX 符号。复制时请优先点击“复制代码”，或只复制代码块内部内容。"
+              buttonLabel="复制手机 App 提示词"
+              prompt={activeTemplate.appPrompt}
+              onCopy={() => onCopy("app")}
+            />
+          </div>
         </section>
       </div>
     </div>
+  );
+}
+
+function PromptCopyPanel({
+  title,
+  description,
+  buttonLabel,
+  prompt,
+  onCopy
+}: {
+  title: string;
+  description: string;
+  buttonLabel: string;
+  prompt: string;
+  onCopy: () => void;
+}) {
+  return (
+    <section className="rounded-md border border-ink/10 bg-white p-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between lg:flex-col">
+        <div>
+          <h4 className="text-sm font-semibold text-ink">{title}</h4>
+          <p className="mt-1 text-xs leading-5 text-ink/55">{description}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onCopy}
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-moss px-3 text-sm font-medium text-white sm:w-auto lg:w-full"
+        >
+          <ClipboardCopy className="h-4 w-4" />
+          {buttonLabel}
+        </button>
+      </div>
+
+      <textarea
+        readOnly
+        value={prompt}
+        rows={18}
+        className="mt-3 w-full rounded-md border border-ink/10 bg-paper px-3 py-2 font-mono text-xs leading-6 text-ink/75 outline-none"
+      />
+    </section>
   );
 }
