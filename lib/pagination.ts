@@ -12,16 +12,25 @@ export type PaginationSearchParams = {
   pageSize?: string;
 };
 
+type PaginationOptions = {
+  defaultPageSize?: number;
+  pageSizeOptions?: readonly number[];
+};
+
 export function getPaginationState(
-  params: PaginationSearchParams | undefined
+  params: PaginationSearchParams | undefined,
+  options: PaginationOptions = {}
 ): PaginationState {
+  const pageSizeOptions = options.pageSizeOptions ?? PAGE_SIZE_OPTIONS;
+  const defaultPageSize = options.defaultPageSize ?? 10;
   const page = normalizePositiveInt(params?.page, 1);
-  const requestedPageSize = normalizePositiveInt(params?.pageSize, 10);
-  const pageSize = PAGE_SIZE_OPTIONS.includes(
-    requestedPageSize as (typeof PAGE_SIZE_OPTIONS)[number]
-  )
+  const requestedPageSize = normalizePositiveInt(
+    params?.pageSize,
+    defaultPageSize
+  );
+  const pageSize = pageSizeOptions.includes(requestedPageSize)
     ? requestedPageSize
-    : 10;
+    : defaultPageSize;
   const from = (page - 1) * pageSize;
 
   return {

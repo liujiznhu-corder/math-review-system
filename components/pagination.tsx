@@ -7,6 +7,8 @@ type PaginationProps = {
   page: number;
   pageSize: number;
   totalCount: number;
+  pageSizeOptions?: readonly number[];
+  showPageSizeSelector?: boolean;
 };
 
 export function Pagination({
@@ -14,8 +16,11 @@ export function Pagination({
   searchParams,
   page,
   pageSize,
-  totalCount
+  totalCount,
+  pageSizeOptions,
+  showPageSizeSelector = true
 }: PaginationProps) {
+  const options = pageSizeOptions ?? PAGE_SIZE_OPTIONS;
   const totalPages = getTotalPages(totalCount, pageSize);
   const safePage = Math.min(Math.max(page, 1), totalPages);
   const start = totalCount === 0 ? 0 : (safePage - 1) * pageSize + 1;
@@ -56,31 +61,33 @@ export function Pagination({
           末页
         </PageLink>
 
-        <form className="ml-0 flex items-center gap-2 lg:ml-2">
-          {Object.entries(searchParams).map(([key, value]) =>
-            value && key !== "page" && key !== "pageSize" ? (
-              <input key={key} type="hidden" name={key} value={value} />
-            ) : null
-          )}
-          <input type="hidden" name="page" value="1" />
-          <select
-            name="pageSize"
-            defaultValue={pageSize}
-            className="h-9 rounded-md border border-ink/15 bg-white px-2 text-sm outline-none focus:border-moss"
-          >
-            {PAGE_SIZE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option} 条/页
-              </option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            className="h-9 rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink"
-          >
-            应用
-          </button>
-        </form>
+        {showPageSizeSelector ? (
+          <form className="ml-0 flex items-center gap-2 lg:ml-2">
+            {Object.entries(searchParams).map(([key, value]) =>
+              value && key !== "page" && key !== "pageSize" ? (
+                <input key={key} type="hidden" name={key} value={value} />
+              ) : null
+            )}
+            <input type="hidden" name="page" value="1" />
+            <select
+              name="pageSize"
+              defaultValue={pageSize}
+              className="h-9 rounded-md border border-ink/15 bg-white px-2 text-sm outline-none focus:border-moss"
+            >
+              {options.map((option) => (
+                <option key={option} value={option}>
+                  {option} 条/页
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="h-9 rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink"
+            >
+              应用
+            </button>
+          </form>
+        ) : null}
       </div>
     </nav>
   );

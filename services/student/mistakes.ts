@@ -20,6 +20,7 @@ export type StudentMistakeListItem = Pick<
   | "raw_latex"
   | "latex_content"
   | "classification_status"
+  | "status"
 > & {
   question_types: StudentMistakeQuestionType | null;
 };
@@ -117,7 +118,7 @@ export async function getStudentMistakesListPage({
   let query = supabase
     .from("mistakes")
     .select(
-      "id, stem, created_at, question_type_id, input_type, raw_text, raw_latex, latex_content, classification_status, question_types(id, level1, level2, level3)",
+      "id, stem, created_at, question_type_id, input_type, raw_text, raw_latex, latex_content, classification_status, status, question_types(id, level1, level2, level3)",
       { count: "exact" }
     )
     .order("created_at", { ascending: false });

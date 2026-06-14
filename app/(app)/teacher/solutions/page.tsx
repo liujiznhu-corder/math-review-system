@@ -621,7 +621,7 @@ async function getMistakeSolutionPage({
       "id, user_id, question_type_id, problem_type, stem, raw_text, raw_latex, latex_content, normalized_stem, answer, analysis, source, updated_at, question_types(id, level1, level2, level3)",
       { count: "exact" }
     )
-    .eq("classification_status", "teacher_confirmed")
+    .in("classification_status", ["student_selected", "teacher_confirmed"])
     .not("question_type_id", "is", null)
     .order("updated_at", { ascending: false });
 

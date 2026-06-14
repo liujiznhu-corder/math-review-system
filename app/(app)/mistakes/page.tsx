@@ -1,14 +1,19 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Eye, Plus } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import { CascadingQuestionTypeFilters } from "@/components/question-types/CascadingQuestionTypeFilters";
-import { getPaginationState } from "@/lib/pagination";
+import { getPaginationState, getTotalPages } from "@/lib/pagination";
 import { redirectTeacherToDashboard } from "@/lib/roles";
+import { createClient } from "@/lib/supabase/server";
 import {
   getStudentMistakesListPage,
   type StudentMistakeListItem
 } from "@/services/student/mistakes";
+import { DeleteMistakeButton } from "./delete-mistake-button";
+
+const PAGE_SIZE = 5;
 
 type MistakesPageProps = {
   searchParams?: Promise<{
@@ -29,6 +34,15 @@ export const dynamic = "force-dynamic";
 export default async function MistakesPage({ searchParams }: MistakesPageProps) {
   await redirectTeacherToDashboard();
 
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
   const params = await searchParams;
   const filters = {
     level1: params?.level1 ?? "",
@@ -38,11 +52,15 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
     status: params?.status ?? "",
     keyword: params?.keyword ?? "",
     page: params?.page,
-    pageSize: params?.pageSize
+    pageSize: String(PAGE_SIZE)
   };
-  const pagination = getPaginationState(params);
+  const pagination = getPaginationState(params, {
+    defaultPageSize: PAGE_SIZE,
+    pageSizeOptions: [PAGE_SIZE]
+  });
   const { questionTypes, mistakes, totalCount, error } =
     await getStudentMistakesListPage({
+      userId: user.id,
       level1: filters.level1,
       level2: filters.level2,
       level3: filters.level3,
@@ -52,6 +70,11 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
       from: pagination.from,
       to: pagination.to
     });
+  const totalPages = getTotalPages(totalCount, pagination.pageSize);
+
+  if (!error && totalCount > 0 && pagination.page > totalPages) {
+    redirect(buildMistakesPageHref(filters, totalPages));
+  }
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
@@ -60,7 +83,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
           <p className="text-sm font-medium text-clay">个人错题库</p>
           <h1 className="mt-1 text-2xl font-semibold text-ink">错题库</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
-            默认只展示题目、所属题型、分类状态和录入时间；答案解析单独进入详情页查看。
+            每页展示 5 道错题，先浏览题目预览、题型和复习状态；完整题目、答案与解析进入详情页查看。
           </p>
         </div>
         <Link
@@ -87,6 +110,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
       <section className="mt-8 rounded-md border border-ink/10 bg-white p-5 shadow-sm">
         <form className="grid gap-4 lg:grid-cols-3">
           <input type="hidden" name="page" value="1" />
+          <input type="hidden" name="pageSize" value={PAGE_SIZE} />
           <CascadingQuestionTypeFilters
             questionTypes={questionTypes}
             selectedLevel1={filters.level1}
@@ -116,7 +140,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
             <input
               name="keyword"
               defaultValue={filters.keyword}
-              placeholder="搜索题干 raw_latex / raw_text / stem"
+              placeholder="搜索题干关键词，按回车或点击筛选"
               className="mt-2 h-10 w-full rounded-md border border-ink/15 px-3 text-sm outline-none focus:border-moss"
             />
           </label>
@@ -158,9 +182,7 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-sm text-ink/55">
-                      {mistake.question_types
-                        ? `${mistake.question_types.level1} / ${mistake.question_types.level2}`
-                        : "未分类"}
+                      {getQuestionTypePath(mistake)}
                     </p>
                     <h3 className="mt-1 text-base font-semibold text-ink">
                       {mistake.question_types?.level3 ?? "未确认题型"}
@@ -172,25 +194,23 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
                         mistake.classification_status
                       )}
                     </span>
+                    <span className="rounded-md bg-moss/10 px-2 py-1 text-xs text-moss">
+                      {getMasteryStatusLabel(mistake.status)}
+                    </span>
                     <span className="rounded-md bg-paper px-2 py-1 text-xs text-ink/65">
                       {formatDate(mistake.created_at)}
                     </span>
                   </div>
                 </div>
 
-                <div className="mt-4 max-w-full overflow-x-auto rounded-md bg-paper p-4">
-                  {mistake.input_type === "latex" ? (
-                    <LatexProblemRenderer
-                      rawLatex={mistake.raw_latex ?? mistake.latex_content}
-                    />
-                  ) : (
-                    <p className="whitespace-pre-wrap text-sm leading-6 text-ink/75">
-                      {mistake.raw_text || mistake.stem}
-                    </p>
-                  )}
+                <div className="mt-4 max-w-full overflow-x-auto rounded-md bg-paper px-4 py-3">
+                  <LatexProblemRenderer
+                    rawLatex={getMistakePreviewLatex(mistake)}
+                    fallback="暂无题干"
+                  />
                 </div>
 
-                <div className="mt-4">
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Link
                     href={`/mistakes/${mistake.id}/answer?returnUrl=${encodeURIComponent("/mistakes")}`}
                     className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-ink/15 bg-white px-3 text-sm font-medium text-ink hover:border-moss/40 hover:text-moss sm:h-9 sm:w-auto"
@@ -198,6 +218,12 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
                     <Eye className="h-4 w-4" />
                     查看答案
                   </Link>
+                  <DeleteMistakeButton
+                    mistakeId={mistake.id}
+                    currentPage={pagination.page}
+                    itemsOnPage={mistakes.length}
+                    searchParams={filters}
+                  />
                 </div>
               </article>
             ))}
@@ -210,9 +236,52 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
           page={pagination.page}
           pageSize={pagination.pageSize}
           totalCount={totalCount}
+          pageSizeOptions={[PAGE_SIZE]}
+          showPageSizeSelector={false}
         />
       </section>
     </main>
+  );
+}
+
+function buildMistakesPageHref(
+  filters: Record<string, string | undefined>,
+  page: number
+) {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(filters)) {
+    if (value && key !== "page") {
+      params.set(key, value);
+    }
+  }
+
+  params.set("page", String(page));
+  params.set("pageSize", String(PAGE_SIZE));
+
+  return `/mistakes?${params.toString()}`;
+}
+
+function getQuestionTypePath(mistake: StudentMistakeListItem) {
+  if (!mistake.question_types) {
+    return "未分类";
+  }
+
+  return [
+    mistake.question_types.level1,
+    mistake.question_types.level2,
+    mistake.question_types.level3
+  ]
+    .filter(Boolean)
+    .join(" / ");
+}
+
+function getMistakePreviewLatex(mistake: StudentMistakeListItem) {
+  return (
+    mistake.raw_latex?.trim() ||
+    mistake.latex_content?.trim() ||
+    mistake.raw_text?.trim() ||
+    mistake.stem
   );
 }
 
@@ -236,4 +305,16 @@ function getClassificationStatusLabel(
   }
 
   return "待教师审核";
+}
+
+function getMasteryStatusLabel(status: StudentMistakeListItem["status"]) {
+  if (status === "mastered") {
+    return "已掌握";
+  }
+
+  if (status === "archived") {
+    return "已归档";
+  }
+
+  return "复习中";
 }

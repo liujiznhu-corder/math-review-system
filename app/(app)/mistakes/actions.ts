@@ -154,6 +154,50 @@ export async function saveMistake(formData: FormData) {
   );
 }
 
+export async function deleteMyMistake(mistakeId: string) {
+  const id = mistakeId.trim();
+
+  if (!id) {
+    return {
+      ok: false,
+      message: "删除失败，请稍后再试。"
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data, error } = await supabase
+    .from("mistakes")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      ok: false,
+      message: "删除失败，请稍后再试。"
+    };
+  }
+
+  revalidatePath("/mistakes");
+  revalidatePath("/reviews");
+  revalidatePath("/dashboard");
+
+  return {
+    ok: true,
+    message: "已从你的错题库删除，不会影响老师题库。"
+  };
+}
+
 function normalizeOptionalString(value: FormDataEntryValue | null) {
   const normalized = String(value ?? "").trim();
   return normalized ? normalized : null;
