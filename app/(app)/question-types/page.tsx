@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { FilePenLine, Plus, Search } from "lucide-react";
+import { FilePenLine, Plus, Search, Tags } from "lucide-react";
 import { CascadingQuestionTypeFilters } from "@/components/question-types/CascadingQuestionTypeFilters";
 import { DeleteQuestionTypeButton } from "@/components/question-types/DeleteQuestionTypeButton";
-import { LatexProblemRenderer } from "@/components/problems/LatexProblemRenderer";
 import {
   canManageQuestionTypes,
   getCurrentUserRole,
@@ -12,14 +11,24 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 import { deleteQuestionType } from "./actions";
 
-type QuestionTypeRow = Database["public"]["Tables"]["question_types"]["Row"];
-type ExampleRow = Pick<
+type QuestionTypeRow = Pick<
+  Database["public"]["Tables"]["question_types"]["Row"],
+  | "id"
+  | "level1"
+  | "level2"
+  | "level3"
+  | "keywords"
+  | "description"
+  | "is_active"
+  | "updated_at"
+>;
+type ExampleSummaryRow = Pick<
   Database["public"]["Tables"]["question_type_examples"]["Row"],
-  "id" | "example_text" | "solution_hint"
+  "id"
 >;
 
-type QuestionTypeWithExamples = QuestionTypeRow & {
-  question_type_examples: ExampleRow[];
+type QuestionTypeListItem = QuestionTypeRow & {
+  question_type_examples: ExampleSummaryRow[];
 };
 
 type QuestionTypesPageProps = {
@@ -58,28 +67,28 @@ export default async function QuestionTypesPage({
   const { data, error } = await supabase
     .from("question_types")
     .select(
-      "id, level1, level2, level3, keywords, description, is_active, created_by, created_at, updated_at, question_type_examples(id, example_text, solution_hint)"
+      "id, level1, level2, level3, keywords, description, is_active, updated_at, question_type_examples(id)"
     )
     .order("level1", { ascending: true })
     .order("level2", { ascending: true })
     .order("level3", { ascending: true });
 
-  const questionTypes = (data ?? []) as QuestionTypeWithExamples[];
+  const questionTypes = (data ?? []) as QuestionTypeListItem[];
   const filteredQuestionTypes = filterQuestionTypes(questionTypes, filters);
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl px-6 py-8">
+    <main className="mx-auto min-h-screen max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium text-clay">共享题型库</p>
           <h1 className="mt-1 text-2xl font-semibold text-ink">题型库管理</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
-            列表页用于查询、筛选、编辑跳转和删除题型；新增和编辑在独立页面完成。
+            管理一级、二级、三级题型，以及识别特征和代表例题。列表页用于快速查找，完整说明和例题预览进入详情查看。
           </p>
         </div>
         <Link
           href="/question-types/new"
-          className="inline-flex h-10 items-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white"
         >
           <Plus className="h-4 w-4" />
           新增题型
@@ -98,8 +107,8 @@ export default async function QuestionTypesPage({
         </p>
       ) : null}
 
-      <section className="mt-8 rounded-md border border-ink/10 bg-white p-5 shadow-sm">
-        <form className="grid gap-4 lg:grid-cols-5">
+      <section className="mt-6 rounded-md border border-ink/10 bg-white p-4 shadow-sm">
+        <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <CascadingQuestionTypeFilters
             questionTypes={questionTypes}
             selectedLevel1={filters.level1}
@@ -119,16 +128,16 @@ export default async function QuestionTypesPage({
               <option value="inactive">已停用</option>
             </select>
           </label>
-          <label className="block text-sm font-medium text-ink">
+          <label className="block text-sm font-medium text-ink xl:col-span-2">
             搜索
             <input
               name="keyword"
               defaultValue={filters.keyword}
-              placeholder="搜索题型 / 识别特征 / 说明 / 例题"
+              placeholder="搜索题型 / 识别特征 / 说明"
               className="mt-2 h-10 w-full rounded-md border border-ink/15 px-3 text-sm outline-none focus:border-moss"
             />
           </label>
-          <div className="flex items-end gap-3 lg:col-span-5">
+          <div className="flex items-end gap-3 md:col-span-2 xl:col-span-6">
             <button
               type="submit"
               className="inline-flex h-10 items-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white"
@@ -148,7 +157,7 @@ export default async function QuestionTypesPage({
 
       <section className="mt-8">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-ink">题型列表</h2>
+          <h2 className="text-lg font-semibold text-ink">题型目录</h2>
           <p className="text-sm text-ink/60">
             共 {filteredQuestionTypes.length} / {questionTypes.length} 个题型
           </p>
@@ -159,99 +168,60 @@ export default async function QuestionTypesPage({
             暂无符合条件的题型。
           </div>
         ) : (
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 grid gap-3">
             {filteredQuestionTypes.map((questionType) => (
               <article
                 key={questionType.id}
-                className="rounded-md border border-ink/10 bg-white p-5 shadow-sm"
+                className="rounded-md border border-ink/10 bg-white p-4 shadow-sm"
               >
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-sm text-ink/55">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-ink/55">
                       {questionType.level1} / {questionType.level2}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <h3 className="text-base font-semibold text-ink">
                         {questionType.level3}
                       </h3>
-                      <span className="rounded-md bg-paper px-2 py-1 text-xs text-ink/60">
-                        {questionType.is_active ? "已启用" : "已停用"}
-                      </span>
+                      <StatusBadge active={questionType.is_active} />
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Link
-                      href={`/question-types/${questionType.id}/edit`}
-                      title="编辑题型"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-ink/15 text-ink hover:border-moss/40 hover:text-moss"
-                    >
-                      <FilePenLine className="h-4 w-4" />
-                    </Link>
-                    <DeleteQuestionTypeButton
-                      id={questionType.id}
-                      action={deleteQuestionType}
-                    />
+
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center lg:min-w-[520px]">
+                    <div className="grid grid-cols-2 gap-2 text-sm text-ink/65">
+                      <SummaryPill
+                        label="识别特征"
+                        value={questionType.keywords.length}
+                        unit="个"
+                      />
+                      <SummaryPill
+                        label="代表例题"
+                        value={questionType.question_type_examples.length}
+                        unit="道"
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2 sm:justify-end">
+                      <Link
+                        href={`/question-types/${questionType.id}`}
+                        className="inline-flex h-9 items-center rounded-md bg-ink px-3 text-sm font-medium text-white hover:bg-ink/90"
+                      >
+                        查看详情
+                      </Link>
+                      <Link
+                        href={`/question-types/${questionType.id}/edit`}
+                        title="编辑题型"
+                        className="inline-flex h-9 items-center gap-2 rounded-md border border-ink/15 px-3 text-sm font-medium text-ink hover:border-moss/40 hover:text-moss"
+                      >
+                        <FilePenLine className="h-4 w-4" />
+                        编辑
+                      </Link>
+                      <DeleteQuestionTypeButton
+                        id={questionType.id}
+                        action={deleteQuestionType}
+                        label="删除"
+                      />
+                    </div>
                   </div>
-                </div>
-
-                <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-                  <section className="rounded-md bg-paper p-4">
-                    <h4 className="text-sm font-semibold text-ink">
-                      题型说明 / 适用场景
-                    </h4>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink/65">
-                      {questionType.description || "暂无说明"}
-                    </p>
-                    <h4 className="mt-4 text-sm font-semibold text-ink">
-                      题型识别特征
-                    </h4>
-                    {questionType.keywords.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {questionType.keywords.map((feature) => (
-                          <span
-                            key={feature}
-                            className="rounded-md bg-white px-2 py-1 text-xs text-ink/70"
-                          >
-                            {feature}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-sm text-ink/50">暂无识别特征</p>
-                    )}
-                  </section>
-
-                  <section className="rounded-md bg-paper p-4">
-                    <h4 className="text-sm font-semibold text-ink">
-                      代表例题预览
-                    </h4>
-                    {questionType.question_type_examples.length > 0 ? (
-                      <div className="mt-3 space-y-3">
-                        {questionType.question_type_examples.map(
-                          (example, index) => (
-                            <div
-                              key={example.id}
-                              className="rounded-md border border-ink/10 bg-white p-3"
-                            >
-                              <p className="mb-2 text-xs font-medium text-ink/55">
-                                例题 {index + 1}
-                              </p>
-                              <LatexProblemRenderer
-                                rawLatex={example.example_text}
-                              />
-                              {example.solution_hint ? (
-                                <p className="mt-3 rounded-md bg-paper px-3 py-2 text-xs leading-5 text-ink/60">
-                                  提示：{example.solution_hint}
-                                </p>
-                              ) : null}
-                            </div>
-                          )
-                        )}
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-sm text-ink/50">暂无代表例题</p>
-                    )}
-                  </section>
                 </div>
               </article>
             ))}
@@ -262,8 +232,40 @@ export default async function QuestionTypesPage({
   );
 }
 
+function StatusBadge({ active }: { active: boolean }) {
+  return (
+    <span
+      className={[
+        "rounded-md px-2 py-1 text-xs font-medium",
+        active ? "bg-moss/10 text-moss" : "bg-ink/5 text-ink/55"
+      ].join(" ")}
+    >
+      {active ? "已启用" : "已停用"}
+    </span>
+  );
+}
+
+function SummaryPill({
+  label,
+  value,
+  unit
+}: {
+  label: string;
+  value: number;
+  unit: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-paper px-3 py-2">
+      <Tags className="h-4 w-4 text-ink/45" />
+      <span>
+        {value} {unit}{label}
+      </span>
+    </div>
+  );
+}
+
 function filterQuestionTypes(
-  questionTypes: QuestionTypeWithExamples[],
+  questionTypes: QuestionTypeListItem[],
   filters: {
     level1: string;
     level2: string;
@@ -301,10 +303,7 @@ function filterQuestionTypes(
         questionType.level2,
         questionType.level3,
         questionType.description ?? "",
-        questionType.keywords.join(" "),
-        questionType.question_type_examples
-          .map((example) => `${example.example_text} ${example.solution_hint ?? ""}`)
-          .join(" ")
+        questionType.keywords.join(" ")
       ]
         .join(" ")
         .toLowerCase();

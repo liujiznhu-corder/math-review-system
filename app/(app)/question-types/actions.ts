@@ -87,6 +87,7 @@ export async function updateQuestionType(formData: FormData) {
 
   revalidatePath("/question-types");
   revalidatePath(editPath);
+  revalidatePath(`/question-types/${payload.id}`);
   redirect(withMessage("/question-types", "题型已更新"));
 }
 
@@ -108,6 +109,7 @@ export async function deleteQuestionType(formData: FormData) {
   }
 
   revalidatePath("/question-types");
+  revalidatePath(`/question-types/${id}`);
   redirect(withMessage("/question-types", "题型已删除"));
 }
 
