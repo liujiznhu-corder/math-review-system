@@ -1,18 +1,23 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  ArrowRight,
   BarChart3,
   BookOpenCheck,
   CheckCircle2,
   ClipboardList,
+  FileText,
   Flame,
   GraduationCap,
+  LibraryBig,
   PenLine,
+  PlusCircle,
   ShieldCheck,
   Target,
   TrendingDown,
   Users
 } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ExamCountdownCard } from "@/components/dashboard/ExamCountdownCard";
 import {
@@ -263,16 +268,45 @@ async function StudentDashboard({ userId }: { userId: string }) {
 
 export async function TeacherDashboard() {
   const stats = await getTeacherStats();
+  const priorityTodoCount =
+    stats.pendingMistakeCount + stats.pendingStudentSolutionCount;
 
   return (
-    <main className="mx-auto min-h-screen max-w-6xl px-6 py-8">
-      <div>
-        <p className="text-sm font-medium text-clay">教师仪表盘</p>
-        <h1 className="mt-1 text-2xl font-semibold text-ink">基础统计</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/65">
-          汇总学生、题型库、待审核错题和近期复习完成情况。跨学生统计在服务端使用 service role 查询。
-        </p>
-      </div>
+    <main className="mx-auto min-h-screen max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+      <section className="rounded-md border border-ink/10 bg-white p-5 shadow-sm sm:p-6">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div>
+            <p className="text-sm font-medium text-clay">教师工作台</p>
+            <h1 className="mt-2 text-3xl font-semibold text-ink">
+              今天先处理最影响学生复盘的事
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-ink/65">
+              从待审核错题和待补答案解析开始，再维护教师题库与题型库。这里仍保留原有统计，只把下一步工作入口放得更清楚。
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <TeacherHeroLink
+                href="/teacher/review-mistakes"
+                label={`${stats.pendingMistakeCount} 道待审核错题`}
+              />
+              <TeacherHeroLink
+                href="/teacher/solutions?source=mistakes"
+                label={`${stats.pendingStudentSolutionCount} 道学生错题待补答案解析`}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-md border border-moss/15 bg-moss/5 p-4">
+            <p className="text-sm font-medium text-moss">今日待办概览</p>
+            <p className="mt-3 text-4xl font-semibold text-ink">
+              {priorityTodoCount}
+              <span className="ml-2 text-base font-medium text-ink/60">项</span>
+            </p>
+            <p className="mt-3 text-sm leading-6 text-ink/65">
+              优先完成学生提交后的确认和答案解析补充，学生端复习体验会立刻更完整。
+            </p>
+          </div>
+        </div>
+      </section>
 
       {stats.error ? (
         <p className="mt-6 rounded-md border border-clay/30 bg-clay/10 px-4 py-3 text-sm text-clay">
@@ -280,42 +314,105 @@ export async function TeacherDashboard() {
         </p>
       ) : null}
 
-      <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <TeacherTaskCard
+          href="/teacher/review-mistakes"
+          icon={ShieldCheck}
+          title="待审核错题"
+          value={stats.pendingMistakeCount}
+          unit="道"
+          description="确认题型后进入学生复习计划"
+          actionLabel="去审核错题"
+          featured={stats.pendingMistakeCount > 0}
+        />
+        <TeacherTaskCard
+          href="/teacher/solutions?source=mistakes"
+          icon={FileText}
+          title="待补答案解析"
+          value={stats.pendingStudentSolutionCount}
+          unit="道"
+          description="学生提交错题待补答案解析"
+          actionLabel="去补答案解析"
+          featured={stats.pendingStudentSolutionCount > 0}
+        />
+        <TeacherTaskCard
+          href="/teacher/problems"
+          icon={LibraryBig}
+          title="教师题库维护"
+          value={stats.problemCount}
+          unit="题"
+          description="检查题库题目与来源信息"
+          actionLabel="管理教师题库"
+        />
+        <TeacherTaskCard
+          href="/teacher/problems/new"
+          icon={PlusCircle}
+          title="录入新题目"
+          value="新增"
+          description="粘贴原生 LaTeX 并保存到题库"
+          actionLabel="录入题目"
+        />
+        <TeacherTaskCard
+          href="/question-types"
+          icon={GraduationCap}
+          title="题型库管理"
+          value={stats.questionTypeCount}
+          unit="个"
+          description="维护三级题型和识别特征"
+          actionLabel="管理题型库"
+        />
+      </section>
+
+      <section className="mt-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-clay">基础统计</p>
+            <h2 className="mt-1 text-xl font-semibold text-ink">
+              教学数据概览
+            </h2>
+          </div>
+          <p className="text-sm leading-6 text-ink/55">
+            统计仍沿用原教师仪表盘口径，跨学生数据在服务端读取。
+          </p>
+        </div>
+      </section>
+
+      <section className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <MetricCard
           icon={Users}
           label="学生数"
           value={stats.studentCount}
-          helper="profiles.role = student"
+          helper="当前学生档案数量"
         />
         <MetricCard
           icon={GraduationCap}
           label="启用题型"
           value={stats.questionTypeCount}
-          helper="question_types.is_active = true"
+          helper="可用于分类和训练"
         />
         <MetricCard
           icon={ShieldCheck}
           label="待审核错题"
           value={stats.pendingMistakeCount}
-          helper="classification_status = pending"
+          helper="等待教师确认题型"
         />
         <MetricCard
           icon={Activity}
           label="错题总数"
           value={stats.mistakeCount}
-          helper="全体学生错题"
+          helper="全体学生错题沉淀"
         />
         <MetricCard
           icon={CheckCircle2}
           label="近 7 天完成复习"
           value={stats.completedReviewCount}
-          helper="review_tasks.status = completed"
+          helper="学生近期复习完成量"
         />
         <MetricCard
           icon={Target}
           label="平均掌握度"
           value={`${Math.round(stats.averageMastery)}%`}
-          helper="knowledge_mastery 平均值"
+          helper="知识点掌握度均值"
         />
       </section>
     </main>
@@ -335,7 +432,9 @@ async function getTeacherStats() {
       pendingMistakes,
       mistakes,
       completedReviews,
-      masteryRows
+      masteryRows,
+      pendingStudentSolutions,
+      problems
     ] = await Promise.all([
       admin
         .from("profiles")
@@ -355,7 +454,14 @@ async function getTeacherStats() {
         .select("id", { count: "exact", head: true })
         .eq("status", "completed")
         .gte("completed_at", sevenDaysAgo.toISOString()),
-      admin.from("knowledge_mastery").select("mastery_percent")
+      admin.from("knowledge_mastery").select("mastery_percent"),
+      admin
+        .from("mistakes")
+        .select("id", { count: "exact", head: true })
+        .in("classification_status", ["student_selected", "teacher_confirmed"])
+        .not("question_type_id", "is", null)
+        .or("answer.is.null,analysis.is.null,answer.eq.,analysis.eq."),
+      admin.from("problems").select("id", { count: "exact", head: true })
     ]);
 
     const masteryValues =
@@ -372,6 +478,8 @@ async function getTeacherStats() {
       pendingMistakeCount: pendingMistakes.count ?? 0,
       mistakeCount: mistakes.count ?? 0,
       completedReviewCount: completedReviews.count ?? 0,
+      pendingStudentSolutionCount: pendingStudentSolutions.count ?? 0,
+      problemCount: problems.count ?? 0,
       averageMastery,
       error:
         students.error?.message ??
@@ -380,6 +488,8 @@ async function getTeacherStats() {
         mistakes.error?.message ??
         completedReviews.error?.message ??
         masteryRows.error?.message ??
+        pendingStudentSolutions.error?.message ??
+        problems.error?.message ??
         null
     };
   } catch (error) {
@@ -389,10 +499,81 @@ async function getTeacherStats() {
       pendingMistakeCount: 0,
       mistakeCount: 0,
       completedReviewCount: 0,
+      pendingStudentSolutionCount: 0,
+      problemCount: 0,
       averageMastery: 0,
       error: error instanceof Error ? error.message : "未知错误"
     };
   }
+}
+
+function TeacherHeroLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-4 text-sm font-medium text-white hover:bg-ink/90"
+    >
+      {label}
+      <ArrowRight className="h-4 w-4" />
+    </Link>
+  );
+}
+
+function TeacherTaskCard({
+  href,
+  icon: Icon,
+  title,
+  value,
+  unit,
+  description,
+  actionLabel,
+  featured = false
+}: {
+  href: string;
+  icon: LucideIcon;
+  title: string;
+  value: number | string;
+  unit?: string;
+  description: string;
+  actionLabel: string;
+  featured?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={[
+        "group flex min-h-[188px] flex-col justify-between rounded-md border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
+        featured
+          ? "border-moss/25 bg-moss/10"
+          : "border-ink/10 bg-white"
+      ].join(" ")}
+    >
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <span
+            className={[
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-md",
+              featured ? "bg-white text-moss" : "bg-paper text-ink/70"
+            ].join(" ")}
+          >
+            <Icon className="h-5 w-5" />
+          </span>
+          <ArrowRight className="h-4 w-4 text-ink/35 transition group-hover:translate-x-0.5 group-hover:text-moss" />
+        </div>
+        <p className="mt-4 text-sm font-medium text-ink/60">{title}</p>
+        <p className="mt-2 text-3xl font-semibold text-ink">
+          {value}
+          {unit ? (
+            <span className="ml-1 text-sm font-medium text-ink/55">
+              {unit}
+            </span>
+          ) : null}
+        </p>
+        <p className="mt-3 text-sm leading-6 text-ink/60">{description}</p>
+      </div>
+      <p className="mt-4 text-sm font-medium text-moss">{actionLabel} →</p>
+    </Link>
+  );
 }
 
 function MetricCard({
