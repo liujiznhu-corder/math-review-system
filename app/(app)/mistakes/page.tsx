@@ -194,8 +194,15 @@ export default async function MistakesPage({ searchParams }: MistakesPageProps) 
                         mistake.classification_status
                       )}
                     </span>
-                    <span className="rounded-md bg-moss/10 px-2 py-1 text-xs text-moss">
-                      {getMasteryStatusLabel(mistake.status)}
+                    <span
+                      className={getReviewStatusBadgeClassName(
+                        mistake.classification_status
+                      )}
+                    >
+                      {getReviewStatusLabel(
+                        mistake.status,
+                        mistake.classification_status
+                      )}
                     </span>
                     <span className="rounded-md bg-paper px-2 py-1 text-xs text-ink/65">
                       {formatDate(mistake.created_at)}
@@ -307,7 +314,14 @@ function getClassificationStatusLabel(
   return "待教师审核";
 }
 
-function getMasteryStatusLabel(status: StudentMistakeListItem["status"]) {
+function getReviewStatusLabel(
+  status: StudentMistakeListItem["status"],
+  classificationStatus: StudentMistakeListItem["classification_status"]
+) {
+  if (classificationStatus === "pending") {
+    return "待确认后复习";
+  }
+
   if (status === "mastered") {
     return "已掌握";
   }
@@ -317,4 +331,14 @@ function getMasteryStatusLabel(status: StudentMistakeListItem["status"]) {
   }
 
   return "复习中";
+}
+
+function getReviewStatusBadgeClassName(
+  classificationStatus: StudentMistakeListItem["classification_status"]
+) {
+  if (classificationStatus === "pending") {
+    return "rounded-md bg-paper px-2 py-1 text-xs text-ink/65";
+  }
+
+  return "rounded-md bg-moss/10 px-2 py-1 text-xs text-moss";
 }
